@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShopBot Seller Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        }
+        .tab-active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message-fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app"></div>
+
+    <script>
+        const API_URL = getAPIUrl();
+        
+        function getAPIUrl() {
+            const currentPath = window.location.pathname;
+            const basePath = currentPath.substring(0, currentPath.lastIndexOf('/'));
+            
+            if (basePath.includes('shopbot')) {
+                return './api.php';
+            }
+            
+            return window.location.origin + '/shopbot/api.php';
+        }
+        
+        console.log('API URL:', API_URL);
+
+        // State Management
+        let currentTab = 'products';
+        let products = [];
+        let conversations = [];
+        let selectedConversation = null;
+        let conversationMessages = [];
+        let lastMessageCount = 0;
+        let lastRenderedMessageCount = 0; // Track how many messages we've rendered
+        let renderedMessageIds = new Set();
+        let stats = {
+            totalProducts: 0,
+            totalOrders: 0,
+            totalRevenue: 0,
+            lowStock: 0
+        };
+        let autoRefreshInterval = null;
+        let chatRefreshInterval = null;
+        let isInitialRender = true;
+
+        // Initialize
+        async function init() {
+            await loadProducts();
+            await updateStats();
+            render();
+            isInitialRender = false;
+            startAutoRefresh();
+        }
+
+        function startAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+            
+            autoRefreshInterval = setInterval(async () => {
+                await loadProducts();
+                await updateStats();
+                
+                // Only update stats without full re-render
+                updateStatsDisplay();
+                
+                if (currentTab === 'customer-chats') {
+                    await loadConversations();
+                    updateConversationsDisplay();
+                }
+            }, 5000);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        }
+
+        async function loadProducts() {
+            try {
+                const response = await fetch(`${API_URL}?path=products`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    products = data.data;
+                } else {
+                    throw new Error(data.message || 'API returned success: false');
+                }
+            } catch (error) {
+                console.error('Error loading products:', error);
+                products = [];
+            }
+        }
+
+        async function loadConversations() {
+            try {
+                console.log('🔄 Loading conversations from:', `${API_URL}?path=conversations/all`);
+                const response = await fetch(`${API_URL}?path=conversations/all`);
+                const data = await response.json();
+                
+                console.log('📥 Conversations response:', data);
+                
+                if (data.success) {
+                    conversations = data.data;
+                    console.log(`✅ Loaded ${conversations.length} conversations`);
+                } else {
+                    console.error('❌ Failed to load conversations:', data);
+                }
+            } catch (error) {
+                console.error('❌ Error loading conversations:', error);
+            }
+        }
+
+        async function loadConversationMessages(conversationId) {
+            try {
+                console.log('📥 Loading messages for conversation:', conversationId);
+                const response = await fetch(`${API_URL}?path=conversations/by-id&id=${conversationId}`);
+                const data = await response.json();
+                
+                console.log('📨 Messages response:', data);
+                
+                if (data.success) {
+                    const previousCount = conversationMessages.length;
+                    conversationMessages = data.data;
+                    console.log(`✅ Loaded ${conversationMessages.length} messages`);
+                    
+                    // Check if new messages arrived
+                    if (conversationMessages.length > previousCount) {
+                        console.log(`🆕 ${conversationMessages.length - previousCount} new message(s)!`);
+                    }
+                    
+                    // Update chat display without full render
+                    updateChatMessagesDisplay();
+                } else {
+                    console.error('❌ Failed to load messages:', data);
+                }
+            } catch (error) {
+                console.error('❌ Error loading messages:', error);
+            }
+        }
+
+        async function sendMessageToCustomer(conversationId, message) {
+            try {
+                const response = await fetch(`${API_URL}?path=conversations/reply`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        conversationId: conversationId,
+                        message: message 
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    await loadConversationMessages(conversationId);
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                console.error('Error sending message:', error);
+                return false;
+            }
+        }
+
+        async function updateStats() {
+            stats.totalProducts = products.length;
+            stats.lowStock = products.filter(p => p.stock < 20).length;
+            stats.totalRevenue = products.reduce((sum, p) => sum + (parseFloat(p.price) * p.stock), 0);
+        }
+
+        function updateStatsDisplay() {
+            // Update stats cards without full re-render
+            const statsElements = {
+                totalProducts: document.querySelector('[data-stat="totalProducts"]'),
+                totalRevenue: document.querySelector('[data-stat="totalRevenue"]'),
+                lowStock: document.querySelector('[data-stat="lowStock"]'),
+                activeChats: document.querySelector('[data-stat="activeChats"]')
+            };
+
+            if (statsElements.totalProducts) {
+                statsElements.totalProducts.textContent = stats.totalProducts;
+            }
+            if (statsElements.totalRevenue) {
+                statsElements.totalRevenue.textContent = '$' + stats.totalRevenue.toFixed(0);
+            }
+            if (statsElements.lowStock) {
+                statsElements.lowStock.textContent = stats.lowStock;
+            }
+            if (statsElements.activeChats) {
+                statsElements.activeChats.textContent = conversations.length;
+            }
+        }
+
+        function updateConversationsDisplay() {
+            const convList = document.getElementById('conversations-list');
+            if (!convList) return;
+
+            // If there are new conversations, log them
+            if (conversations.length > 0) {
+                console.log(`📋 Displaying ${conversations.length} conversations`);
+            }
+
+            convList.innerHTML = conversations.map(conv => {
+                const isSelected = selectedConversation && selectedConversation.id === conv.id;
+                return `
+                <div ${!isSelected ? `onclick="selectConversation(${JSON.stringify(conv).replace(/"/g, '&quot;')})"` : ''} 
+                     class="p-4 rounded-lg ${!isSelected ? 'cursor-pointer' : 'cursor-default'} transition-colors ${isSelected ? 'bg-purple-100 border-2 border-purple-600' : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'}">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-semibold text-gray-900">Customer #${conv.session_id.substring(0, 8)}</span>
+                        <span class="text-xs text-gray-500">${conv.message_count} msgs</span>
+                    </div>
+                    <p class="text-sm text-gray-600 truncate">${conv.last_message || 'No messages yet'}</p>
+                    <p class="text-xs text-gray-400 mt-1">${new Date(conv.last_message_time || conv.created_at).toLocaleString()}</p>
+                </div>
+            `}).join('');
+            
+            // Auto-select first conversation if none selected
+            if (!selectedConversation && conversations.length > 0) {
+                console.log('🔄 Auto-selecting first conversation');
+                selectConversation(conversations[0]);
+            }
+        }
+
+
+        function updateChatMessagesDisplay() {
+            const chatMessages = document.getElementById('chat-messages');
+            if (!chatMessages) return;
+
+            const scrollAtBottom = chatMessages.scrollHeight - chatMessages.scrollTop <= chatMessages.clientHeight + 50;
+
+            // Check if we have new messages to add
+            const newMessagesCount = conversationMessages.length - lastRenderedMessageCount;
+            
+            if (newMessagesCount > 0) {
+                console.log(`➕ Adding ${newMessagesCount} new message(s)`);
+                
+                // Only append new messages instead of re-rendering everything
+                const newMessagesHtml = conversationMessages.slice(lastRenderedMessageCount).map(msg => {
+                    renderedMessageIds.add(msg.id);
+                    return `
+                    <div class="flex ${msg.sender_type === 'seller' ? 'justify-end' : 'justify-start'} message-fade-in" data-msg-id="${msg.id}">
+                        <div class="max-w-[70%] rounded-lg px-4 py-2 ${
+                            msg.sender_type === 'seller' 
+                                ? 'bg-purple-600 text-white' 
+                                : 'bg-white text-gray-800 shadow'
+                        }">
+                            <p class="text-sm font-semibold mb-1 opacity-80">${msg.sender_type === 'seller' ? '👤 You (Seller)' : '👥 Customer'}</p>
+                            <p>${msg.message}</p>
+                            <p class="text-xs opacity-70 mt-1">${new Date(msg.created_at).toLocaleTimeString()}</p>
+                        </div>
+                    </div>
+                `}).join('');
+                
+                chatMessages.insertAdjacentHTML('beforeend', newMessagesHtml);
+                lastRenderedMessageCount = conversationMessages.length;
+            } else if (lastRenderedMessageCount === 0 && conversationMessages.length > 0) {
+                // First render - show all messages
+                console.log(`📝 Initial render with ${conversationMessages.length} messages`);
+                chatMessages.innerHTML = conversationMessages.map(msg => {
+                    renderedMessageIds.add(msg.id);
+                    return `
+                    <div class="flex ${msg.sender_type === 'seller' ? 'justify-end' : 'justify-start'} message-fade-in" data-msg-id="${msg.id}">
+                        <div class="max-w-[70%] rounded-lg px-4 py-2 ${
+                            msg.sender_type === 'seller' 
+                                ? 'bg-purple-600 text-white' 
+                                : 'bg-white text-gray-800 shadow'
+                        }">
+                            <p class="text-sm font-semibold mb-1 opacity-80">${msg.sender_type === 'seller' ? '👤 You (Seller)' : '👥 Customer'}</p>
+                            <p>${msg.message}</p>
+                            <p class="text-xs opacity-70 mt-1">${new Date(msg.created_at).toLocaleTimeString()}</p>
+                        </div>
+                    </div>
+                `}).join('');
+                lastRenderedMessageCount = conversationMessages.length;
+            }
+
+            // Update message count in header
+            const headerMessageCount = document.getElementById('chat-header-message-count');
+            if (headerMessageCount) {
+                headerMessageCount.textContent = `${conversationMessages.length} messages • 🔴 Live (updates every 3s)`;
+            }
+
+            // Auto-scroll if user was at bottom
+            if (scrollAtBottom || newMessagesCount > 0) {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            if (tab === 'customer-chats') {
+                console.log('📱 Switching to customer chats tab');
+                // Load conversations immediately
+                loadConversations().then(() => {
+                    console.log(`✅ Loaded ${conversations.length} conversations`);
+                    render();
+                    // Start auto-refresh after render
+                    startChatRefresh();
+                });
+            } else {
+                stopChatRefresh();
+                render();
+            }
+        }
+
+        function startChatRefresh() {
+            if (chatRefreshInterval) {
+                clearInterval(chatRefreshInterval);
+            }
+            
+            console.log('🔄 Starting chat auto-refresh (every 3 seconds)');
+            
+            // Faster refresh for better real-time experience
+            chatRefreshInterval = setInterval(async () => {
+                // Don't refresh if user is typing or sending a message
+                const input = document.getElementById('seller-message-input');
+                if (input && (document.activeElement === input || isSendingMessage)) {
+                    console.log('⏸️ Skipping refresh - user is typing or sending');
+                    return;
+                }
+                
+                // Don't update if there's text in the input field
+                if (input && input.value.trim().length > 0) {
+                    console.log('⏸️ Skipping refresh - input has text');
+                    return;
+                }
+                
+                console.log('🔄 Refreshing conversations and messages...');
+                await loadConversations();
+                
+                // Update conversation list
+                updateConversationsDisplay();
+                
+                // Reload messages for selected conversation
+                if (selectedConversation) {
+                    const previousCount = conversationMessages.length;
+                    await loadConversationMessages(selectedConversation.id);
+                    
+                    // If new messages arrived, log it
+                    if (conversationMessages.length > previousCount) {
+                        console.log(`🆕 ${conversationMessages.length - previousCount} new message(s) received!`);
+                    }
+                }
+            }, 3000); // Refresh every 3 seconds
+        }
+
+        function stopChatRefresh() {
+            if (chatRefreshInterval) {
+                clearInterval(chatRefreshInterval);
+                chatRefreshInterval = null;
+            }
+        }
+
+        async function selectConversation(conversation) {
+            // Check if we're selecting the same conversation
+            const isSameConversation = selectedConversation && selectedConversation.id === conversation.id;
+            
+            selectedConversation = conversation;
+            
+            // Don't clear messages if selecting the same conversation
+            if (!isSameConversation) {
+                conversationMessages = [];
+                lastRenderedMessageCount = 0; // Reset counter for new conversation
+            }
+            
+            await loadConversationMessages(conversation.id);
+            
+            // Only re-render the chat window area if switching conversations
+            if (!isSameConversation) {
+                const chatWindowContainer = document.getElementById('chat-window-container');
+                if (chatWindowContainer) {
+                    chatWindowContainer.innerHTML = renderChatWindow();
+                    // Set counter after initial render
+                    lastRenderedMessageCount = conversationMessages.length;
+                    // Attach event listeners after rendering
+                    attachChatEventListeners();
+                }
+            } else {
+                // Same conversation - just update messages display
+                updateChatMessagesDisplay();
+            }
+        }
+
+        async function addProduct(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            
+            const product = {
+                name: formData.get('name'),
+                price: parseFloat(formData.get('price')),
+                image: formData.get('image'),
+                category: formData.get('category'),
+                rating: parseFloat(formData.get('rating')),
+                reviews: parseInt(formData.get('reviews')),
+                warehouse: formData.get('warehouse'),
+                delivery_days: parseInt(formData.get('delivery_days')),
+                stock: parseInt(formData.get('stock'))
+            };
+
+            if (!product.name || !product.price || !product.category) {
+                alert('Please fill in all required fields!');
+                return;
+            }
+
+            try {
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const originalText = submitBtn.innerHTML;
+                submitBtn.innerHTML = '⏳ Adding...';
+                submitBtn.disabled = true;
+
+                const response = await fetch(`${API_URL}?path=products/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(product)
+                });
+                
+                const data = await response.json();
+                
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+
+                if (data.success) {
+                    alert('✅ Product added successfully!');
+                    form.reset();
+                    await loadProducts();
+                    await updateStats();
+                    switchTab('products');
+                } else {
+                    alert('❌ Error: ' + (data.message || 'Failed to add product'));
+                }
+            } catch (error) {
+                alert('❌ Error adding product: ' + error.message);
+            }
+        }
+
+        async function deleteProduct(id, name) {
+            if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
+
+            try {
+                const response = await fetch(`${API_URL}?path=products/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ productId: id })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert('✅ Product deleted!');
+                    await loadProducts();
+                    await updateStats();
+                    render();
+                } else {
+                    alert('❌ Error: ' + (data.message || 'Failed to delete'));
+                }
+            } catch (error) {
+                alert('❌ Error deleting product: ' + error.message);
+            }
+        }
+
+        async function updateStock(id, newStock, productName) {
+            if (newStock < 0) {
+                alert('Stock cannot be negative!');
+                await loadProducts();
+                render();
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}?path=products/update-stock`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ productId: id, stock: parseInt(newStock) })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    console.log(`✅ Stock updated for ${productName}`);
+                    await loadProducts();
+                    await updateStats();
+                    updateStatsDisplay();
+                } else {
+                    alert('❌ Error updating stock');
+                }
+            } catch (error) {
+                console.error('Error updating stock:', error);
+                alert('❌ Error updating stock');
+            }
+        }
+
+        function filterProducts(query) {
+            const rows = document.querySelectorAll('.product-row');
+            rows.forEach(row => {
+                const name = row.getAttribute('data-name');
+                if (name.includes(query.toLowerCase())) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        function toggleAutoRefresh() {
+            const btn = document.getElementById('auto-refresh-btn');
+            if (autoRefreshInterval) {
+                stopAutoRefresh();
+                btn.innerHTML = '⏸️ Auto-Sync OFF';
+                btn.className = 'px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-semibold';
+            } else {
+                startAutoRefresh();
+                btn.innerHTML = '🔄 Auto-Sync ON';
+                btn.className = 'px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-semibold';
+            }
+        }
+
+        function render() {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <!-- Header -->
+                <header class="bg-white shadow-sm sticky top-0 z-50">
+                    <div class="max-w-7xl mx-auto px-4 py-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-12 h-12 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl flex items-center justify-center text-white text-2xl">
+                                    🏪
+                                </div>
+                                <div>
+                                    <h1 class="text-2xl font-bold text-gray-900">ShopBot Seller</h1>
+                                    <p class="text-sm text-gray-500">Manage your store</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="toggleAutoRefresh()" id="auto-refresh-btn" class="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors font-semibold">
+                                    🔄 Auto-Sync ON
+                                </button>
+                                <a href="index.html" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                                    👁️ View Store
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Stats Cards -->
+                <div class="max-w-7xl mx-auto px-4 py-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-blue-500">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-600">Total Products</p>
+                                    <p class="text-3xl font-bold text-gray-900" data-stat="totalProducts">${stats.totalProducts}</p>
+                                </div>
+                                <div class="text-4xl">📦</div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-600">Inventory Value</p>
+                                    <p class="text-3xl font-bold text-gray-900" data-stat="totalRevenue">$${stats.totalRevenue.toFixed(0)}</p>
+                                </div>
+                                <div class="text-4xl">💰</div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-600">Low Stock Items</p>
+                                    <p class="text-3xl font-bold text-gray-900" data-stat="lowStock">${stats.lowStock}</p>
+                                </div>
+                                <div class="text-4xl">⚠️</div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white rounded-xl shadow-md p-6 border-l-4 border-purple-500">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-600">Active Chats</p>
+                                    <p class="text-3xl font-bold text-gray-900" data-stat="activeChats">${conversations.length}</p>
+                                </div>
+                                <div class="text-4xl">💬</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="bg-white rounded-xl shadow-md mb-6">
+                        <div class="flex border-b border-gray-200">
+                            <button onclick="switchTab('products')" class="px-6 py-4 font-semibold transition-colors ${currentTab === 'products' ? 'tab-active' : 'text-gray-600 hover:text-gray-900'}">
+                                📦 Products
+                            </button>
+                            <button onclick="switchTab('add-product')" class="px-6 py-4 font-semibold transition-colors ${currentTab === 'add-product' ? 'tab-active' : 'text-gray-600 hover:text-gray-900'}">
+                                ➕ Add Product
+                            </button>
+                            <button onclick="switchTab('customer-chats')" class="px-6 py-4 font-semibold transition-colors relative ${currentTab === 'customer-chats' ? 'tab-active' : 'text-gray-600 hover:text-gray-900'}">
+                                💬 Customer Chats
+                                ${conversations.length > 0 ? '<span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>' : ''}
+                            </button>
+                            <button onclick="switchTab('analytics')" class="px-6 py-4 font-semibold transition-colors ${currentTab === 'analytics' ? 'tab-active' : 'text-gray-600 hover:text-gray-900'}">
+                                📊 Analytics
+                            </button>
+                        </div>
+
+                        <div class="p-6">
+                            ${currentTab === 'products' ? renderProductsTab() : ''}
+                            ${currentTab === 'add-product' ? renderAddProductTab() : ''}
+                            ${currentTab === 'customer-chats' ? renderCustomerChatsTab() : ''}
+                            ${currentTab === 'analytics' ? renderAnalyticsTab() : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderProductsTab() {
+            return `
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold text-gray-900">All Products (${products.length})</h2>
+                        <input type="text" placeholder="🔍 Search products..." class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent" onkeyup="filterProducts(this.value)">
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rating</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Warehouse</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                ${products.map(product => `
+                                    <tr class="hover:bg-gray-50 product-row" data-name="${product.name.toLowerCase()}">
+                                        <td class="px-4 py-4">
+                                            <div class="flex items-center gap-3">
+                                                <div class="text-3xl">${product.image}</div>
+                                                <div>
+                                                    <p class="font-semibold text-gray-900">${product.name}</p>
+                                                    <p class="text-sm text-gray-500">ID: ${product.id}</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-4">
+                                            <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold capitalize">${product.category}</span>
+                                        </td>
+                                        <td class="px-4 py-4 font-semibold text-gray-900">$${product.price}</td>
+                                        <td class="px-4 py-4">
+                                            <input type="number" value="${product.stock}" min="0" class="w-20 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-purple-600" onchange="updateStock(${product.id}, this.value, '${product.name}')">
+                                            ${product.stock < 20 ? '<span class="ml-2 text-xs text-red-600 font-semibold">⚠️ Low</span>' : ''}
+                                        </td>
+                                        <td class="px-4 py-4">
+                                            <div class="flex items-center gap-1">
+                                                <span class="text-yellow-500">⭐</span>
+                                                <span class="font-semibold">${product.rating}</span>
+                                                <span class="text-gray-500 text-sm">(${product.reviews})</span>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-4 text-sm text-gray-600">${product.warehouse}</td>
+                                        <td class="px-4 py-4">
+                                            <button onclick="deleteProduct(${product.id}, '${product.name}')" class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm">
+                                                🗑️ Delete
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAddProductTab() {
+            return `
+                <div class="max-w-2xl">
+                    <h2 class="text-xl font-bold text-gray-900 mb-6">Add New Product</h2>
+                    
+                    <form onsubmit="addProduct(event); return false;" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Product Name *</label>
+                                <input type="text" name="name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent" placeholder="e.g., Wireless Headphones">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Price ($) *</label>
+                                <input type="number" name="price" step="0.01" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent" placeholder="0.00">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Emoji Icon *</label>
+                                <input type="text" name="image" required maxlength="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent text-3xl text-center" placeholder="🎧">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Category *</label>
+                                <select name="category" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                                    <option value="">Select category</option>
+                                    <option value="electronics">Electronics</option>
+                                    <option value="sports">Sports</option>
+                                    <option value="home">Home</option>
+                                    <option value="accessories">Accessories</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Rating (0-5) *</label>
+                                <input type="number" name="rating" step="0.1" min="0" max="5" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent" placeholder="4.5">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Reviews Count *</label>
+                                <input type="number" name="reviews" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent" placeholder="100">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Warehouse *</label>
+                                <select name="warehouse" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent">
+                                    <option value="">Select warehouse</option>
+                                    <option value="Jakarta">Jakarta</option>
+                                    <option value="Bandung">Bandung</option>
+                                    <option value="Cikarang">Cikarang</option>
+                                    <option value="Surabaya">Surabaya</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Delivery Days *</label>
+                                <input type="number" name="delivery_days" min="1" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent" placeholder="2">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Initial Stock *</label>
+                            <input type="number" name="stock" min="0" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent" placeholder="50">
+                        </div>
+
+                        <div class="flex gap-4 pt-4">
+                            <button type="submit" class="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 rounded-lg hover:opacity-90 transition-opacity">
+                                ➕ Add Product
+                            </button>
+                            <button type="reset" class="px-6 bg-gray-200 text-gray-700 font-semibold py-3 rounded-lg hover:bg-gray-300 transition-colors">
+                                Clear Form
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+        }
+
+        function renderCustomerChatsTab() {
+            if (conversations.length === 0) {
+                return `
+                    <div class="text-center py-12">
+                        <div class="text-6xl mb-4">💬</div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2">No Customer Chats Yet</h3>
+                        <p class="text-gray-600">When customers start conversations, they'll appear here.</p>
+                        <p class="text-sm text-gray-500 mt-4">🔄 Auto-refreshing every 3 seconds...</p>
+                        <button onclick="loadConversations().then(() => render())" class="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                            🔄 Refresh Now
+                        </button>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="grid grid-cols-3 gap-6 h-[600px]">
+                    <!-- Conversations List -->
+                    <div class="col-span-1 border-r border-gray-200 pr-4 overflow-y-auto">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">Active Conversations (${conversations.length})</h3>
+                            <div class="flex gap-2">
+                                <button onclick="loadConversations().then(() => { updateConversationsDisplay(); updateStatsDisplay(); })" class="text-xs bg-blue-100 text-blue-600 px-3 py-1 rounded hover:bg-blue-200" title="Refresh conversations">
+                                    🔄 Refresh
+                                </button>
+                                <button onclick="clearAllConversations()" class="text-xs bg-red-100 text-red-600 px-3 py-1 rounded hover:bg-red-200" title="Clear all chat history">
+                                    🗑️ Clear All
+                                </button>
+                            </div>
+                        </div>
+                        <div id="conversations-list" class="space-y-2">
+                            ${conversations.map(conv => `
+                                <div onclick="selectConversation(${JSON.stringify(conv).replace(/"/g, '&quot;')})" 
+                                     class="p-4 rounded-lg cursor-pointer transition-colors ${selectedConversation && selectedConversation.id === conv.id ? 'bg-purple-100 border-2 border-purple-600' : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'}">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="font-semibold text-gray-900">Customer #${conv.session_id.substring(0, 8)}</span>
+                                        <span class="text-xs text-gray-500">${conv.message_count} msgs</span>
+                                    </div>
+                                    <p class="text-sm text-gray-600 truncate">${conv.last_message || 'No messages yet'}</p>
+                                    <p class="text-xs text-gray-400 mt-1">${new Date(conv.last_message_time || conv.created_at).toLocaleString()}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Chat Window -->
+                    <div class="col-span-2 flex flex-col" id="chat-window-container">
+                        ${selectedConversation ? renderChatWindow() : `
+                            <div class="flex-1 flex items-center justify-center text-gray-400">
+                                <div class="text-center">
+                                    <div class="text-6xl mb-4">👈</div>
+                                    <p class="text-lg">Select a conversation to start chatting</p>
+                                </div>
+                            </div>
+                        `}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderChatWindow() {
+            return `
+                <div class="flex flex-col h-full">
+                    <div class="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 rounded-lg mb-4">
+                        <h3 class="font-semibold">Chatting with Customer #${selectedConversation.session_id.substring(0, 8)}</h3>
+                        <p class="text-sm text-purple-100" id="chat-header-message-count">${conversationMessages.length} messages • 🔴 Live (updates every 3s)</p>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto mb-4 space-y-3 bg-gray-50 rounded-lg p-4" id="chat-messages">
+                        ${conversationMessages.map(msg => `
+                            <div class="flex ${msg.sender_type === 'seller' ? 'justify-end' : 'justify-start'} message-fade-in" data-msg-id="${msg.id}">
+                                <div class="max-w-[70%] rounded-lg px-4 py-2 ${
+                                    msg.sender_type === 'seller' 
+                                        ? 'bg-purple-600 text-white' 
+                                        : 'bg-white text-gray-800 shadow'
+                                }">
+                                    <p class="text-sm font-semibold mb-1 opacity-80">${msg.sender_type === 'seller' ? '👤 You (Seller)' : '👥 Customer'}</p>
+                                    <p>${msg.message}</p>
+                                    <p class="text-xs opacity-70 mt-1">${new Date(msg.created_at).toLocaleTimeString()}</p>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <div class="flex gap-2">
+                        <input 
+                            type="text" 
+                            id="seller-message-input"
+                            placeholder="Type your response..." 
+                            class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600"
+                        />
+                        <button 
+                            id="send-seller-message"
+                            class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors font-semibold">
+                            Send
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function attachChatEventListeners() {
+            // Remove old listeners first
+            const sendBtn = document.getElementById('send-seller-message');
+            const input = document.getElementById('seller-message-input');
+            
+            if (sendBtn) {
+                // Clone and replace to remove all old event listeners
+                const newSendBtn = sendBtn.cloneNode(true);
+                sendBtn.parentNode.replaceChild(newSendBtn, sendBtn);
+                
+                // Add fresh event listener
+                newSendBtn.addEventListener('click', handleSendSellerMessage);
+            }
+            
+            if (input) {
+                // Clone and replace to remove all old event listeners
+                const newInput = input.cloneNode(true);
+                input.parentNode.replaceChild(newInput, input);
+                
+                // Add fresh event listener
+                newInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendSellerMessage();
+                    }
+                });
+            }
+        }
+
+        let isSendingMessage = false;
+        let lastSentMessage = '';
+        let lastSentTime = 0;
+        let sentMessageIds = new Set(); // Track all sent messages
+
+        async function handleSendSellerMessage() {
+            const input = document.getElementById('seller-message-input');
+            if (!input) {
+                console.log('⚠️ Input element not found');
+                return;
+            }
+            
+            const message = input.value.trim();
+            
+            if (!message || !selectedConversation) {
+                console.log('⚠️ No message or conversation');
+                return;
+            }
+            
+            // Create unique message fingerprint
+            const messageFingerprint = `${selectedConversation.id}-${message}-${Date.now()}`;
+            
+            // Strong duplicate prevention
+            const now = Date.now();
+            if (isSendingMessage) {
+                console.log('⚠️ Already sending a message - blocked');
+                return;
+            }
+            
+            if (message === lastSentMessage && now - lastSentTime < 5000) {
+                console.log('⚠️ Duplicate message within 5 seconds - blocked');
+                return;
+            }
+            
+            console.log('📤 Sending message:', message);
+            
+            isSendingMessage = true;
+            lastSentMessage = message;
+            lastSentTime = now;
+            
+            // Clear input immediately to prevent accidental re-sends
+            input.value = '';
+            input.disabled = true;
+            
+            const success = await sendMessageToCustomer(selectedConversation.id, message);
+            
+            input.disabled = false;
+            
+            if (!success) {
+                alert('Failed to send message');
+                // Restore message on failure
+                input.value = message;
+            } else {
+                console.log('✅ Message sent successfully');
+                sentMessageIds.add(messageFingerprint);
+            }
+            
+            // Wait a bit before allowing next send
+            setTimeout(() => {
+                isSendingMessage = false;
+            }, 1000);
+        }
+
+        async function clearAllConversations() {
+            if (!confirm('Are you sure you want to delete ALL chat history? This cannot be undone!')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}?path=conversations/cleanup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ days: 0 }) // Delete all
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert(`✅ ${data.deleted} conversations deleted!`);
+                    conversations = [];
+                    selectedConversation = null;
+                    conversationMessages = [];
+                    render();
+                } else {
+                    alert('❌ Failed to clear conversations');
+                }
+            } catch (error) {
+                console.error('Error clearing conversations:', error);
+                alert('❌ Error clearing conversations');
+            }
+        }
+
+        function renderAnalyticsTab() {
+            const categoryBreakdown = products.reduce((acc, p) => {
+                acc[p.category] = (acc[p.category] || 0) + 1;
+                return acc;
+            }, {});
+
+            const warehouseBreakdown = products.reduce((acc, p) => {
+                acc[p.warehouse] = (acc[p.warehouse] || 0) + 1;
+                return acc;
+            }, {});
+
+            return `
+                <div class="space-y-6">
+                    <h2 class="text-xl font-bold text-gray-900">Analytics Overview</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-gray-50 rounded-xl p-6">
+                            <h3 class="font-semibold text-gray-900 mb-4">Products by Category</h3>
+                            <div class="space-y-3">
+                                ${Object.entries(categoryBreakdown).map(([cat, count]) => `
+                                    <div>
+                                        <div class="flex justify-between mb-1">
+                                            <span class="text-sm text-gray-600 capitalize">${cat}</span>
+                                            <span class="text-sm font-semibold text-gray-900">${count} items</span>
+                                        </div>
+                                        <div class="w-full bg-gray-200 rounded-full h-2">
+                                            <div class="bg-purple-600 h-2 rounded-full" style="width: ${(count / products.length) * 100}%"></div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-50 rounded-xl p-6">
+                            <h3 class="font-semibold text-gray-900 mb-4">Products by Warehouse</h3>
+                            <div class="space-y-3">
+                                ${Object.entries(warehouseBreakdown).map(([wh, count]) => `
+                                    <div>
+                                        <div class="flex justify-between mb-1">
+                                            <span class="text-sm text-gray-600">${wh}</span>
+                                            <span class="text-sm font-semibold text-gray-900">${count} items</span>
+                                        </div>
+                                        <div class="w-full bg-gray-200 rounded-full h-2">
+                                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${(count / products.length) * 100}%"></div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 rounded-xl p-6">
+                        <h3 class="font-semibold text-gray-900 mb-4">Top Rated Products</h3>
+                        <div class="space-y-2">
+                            ${products.sort((a, b) => b.rating - a.rating).slice(0, 5).map((p, i) => `
+                                <div class="flex items-center justify-between p-3 bg-white rounded-lg">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-2xl font-bold text-gray-300">#${i + 1}</span>
+                                        <span class="text-2xl">${p.image}</span>
+                                        <span class="font-medium text-gray-900">${p.name}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-yellow-500">⭐</span>
+                                        <span class="font-semibold text-gray-900">${p.rating}</span>
+                                        <span class="text-gray-500 text-sm">(${p.reviews})</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        init();
+    </script>
+</body>
+</html>
