@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShopBot - Voice Shopping Assistant</title>
+    
+    <!-- React Libraries -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+        
+        // Simple SVG Icons
+        const Send = ({ size = 24 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+        );
+        
+        const ShoppingBag = ({ size = 24 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <path d="M16 10a4 4 0 0 1-8 0"></path>
+            </svg>
+        );
+        
+        const Star = ({ size = 24, filled = false }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+            </svg>
+        );
+        
+        const Mic = ({ size = 24 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+        );
+        
+        const MicOff = ({ size = 24 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="1" y1="1" x2="23" y2="23"></line>
+                <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path>
+                <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+        );
+        
+        const Volume2 = ({ size = 24 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
+        );
+        
+        const VolumeX = ({ size = 24 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <line x1="23" y1="9" x2="17" y2="15"></line>
+                <line x1="17" y1="9" x2="23" y2="15"></line>
+            </svg>
+        );
+
+        const ShopChatbot = () => {
+            // API Configuration
+            const getAPIUrl = () => {
+                if (window.location.protocol === 'file:') {
+                    return 'http://localhost/shopbot/api.php';
+                }
+                return window.location.origin + '/shopbot/api.php';
+            };
+            
+            const API_URL = getAPIUrl();
+            
+            const [messages, setMessages] = useState([
+                {
+                    id: 1,
+                    type: 'bot',
+                    content: "Hi! Welcome to our store! How can I help you today?",
+                    timestamp: new Date(),
+                    quickReplies: ['Browse Products', 'Cheapest Items', 'Fastest Delivery', 'Best Rated']
+                }
+            ]);
+            const [inputValue, setInputValue] = useState('');
+            const [isTyping, setIsTyping] = useState(false);
+            const [cart, setCart] = useState([]);
+            const [isListening, setIsListening] = useState(false);
+            const [isSpeechEnabled, setIsSpeechEnabled] = useState(true);
+            const [voiceError, setVoiceError] = useState('');
+            const [sellerMode, setSellerMode] = useState(false);
+            const [conversationId, setConversationId] = useState(null);
+            const [apiConnected, setApiConnected] = useState(false);
+            const [isSending, setIsSending] = useState(false);
+            const [lastFetchedMessageCount, setLastFetchedMessageCount] = useState(0);
+            
+            const recognitionRef = useRef(null);
+            const messagesEndRef = useRef(null);
+            const pollingInterval = useRef(null);
+            const renderedMessageIds = useRef(new Set());
+
+            const scrollToBottom = () => {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            };
+
+            useEffect(() => {
+                scrollToBottom();
+            }, [messages, isTyping]);
+
+            useEffect(() => {
+                fetchCart();
+                checkAPIConnection();
+                
+                const refreshInterval = setInterval(() => {
+                    fetchCart();
+                }, 10000);
+                
+                return () => clearInterval(refreshInterval);
+            }, []);
+
+            const checkAPIConnection = async () => {
+                try {
+                    const response = await fetch(`${API_URL}?path=products`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        setApiConnected(true);
+                        console.log('✅ API Connected:', API_URL);
+                    } else {
+                        setApiConnected(false);
+                        console.error('❌ API Response Error:', response.status);
+                    }
+                } catch (error) {
+                    setApiConnected(false);
+                    console.error('❌ API Connection Failed:', error);
+                    console.log('📍 Attempting to connect to:', API_URL);
+                }
+            };
+
+            // Poll for seller messages when in seller mode
+            useEffect(() => {
+                if (sellerMode && conversationId) {
+                    // Initial fetch
+                    fetchSellerMessages();
+                    
+                    // Poll every 3 seconds
+                    pollingInterval.current = setInterval(() => {
+                        fetchSellerMessages();
+                    }, 3000);
+                } else {
+                    if (pollingInterval.current) {
+                        clearInterval(pollingInterval.current);
+                    }
+                }
+                
+                return () => {
+                    if (pollingInterval.current) {
+                        clearInterval(pollingInterval.current);
+                    }
+                };
+            }, [sellerMode, conversationId]);
+
+            const fetchCart = async () => {
+                try {
+                    const response = await fetch(`${API_URL}?path=cart`);
+                    const data = await response.json();
+                    if (data.success) {
+                        setCart(data.data.items);
+                    }
+                } catch (error) {
+                    console.error('Error fetching cart:', error);
+                }
+            };
+
+            const fetchSellerMessages = async () => {
+                if (!conversationId || isSending) return;
+                
+                try {
+                    const response = await fetch(`${API_URL}?path=conversations/messages`);
+                    const data = await response.json();
+                    
+                    if (data.success && data.data.length > 0) {
+                        // Only add new messages that we haven't rendered yet
+                        const newMessages = data.data.filter(msg => 
+                            !renderedMessageIds.current.has(msg.id)
+                        );
+                        
+                        if (newMessages.length > 0) {
+                            console.log(`📥 Found ${newMessages.length} new message(s)`);
+                            
+                            newMessages.forEach(dbMsg => {
+                                if (dbMsg.sender_type === 'seller') {
+                                    const newMessage = {
+                                        id: Date.now() + Math.random(),
+                                        dbId: dbMsg.id,
+                                        type: 'seller',
+                                        content: dbMsg.message,
+                                        timestamp: new Date(dbMsg.created_at)
+                                    };
+                                    
+                                    setMessages(prev => [...prev, newMessage]);
+                                    renderedMessageIds.current.add(dbMsg.id);
+                                    speak("Seller replied: " + dbMsg.message);
+                                }
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error fetching seller messages:', error);
+                }
+            };
+
+            const speak = (text) => {
+                if (!isSpeechEnabled) return;
+                
+                try {
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.rate = 1.0;
+                    utterance.pitch = 1.0;
+                    utterance.volume = 1.0;
+                    utterance.lang = 'en-US';
+                    window.speechSynthesis.speak(utterance);
+                } catch (error) {
+                    console.error('Speech synthesis error:', error);
+                }
+            };
+
+            const startListening = async () => {
+                setVoiceError('');
+                
+                try {
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    
+                    if (!SpeechRecognition) {
+                        setVoiceError('Voice recognition not supported. Please use Chrome, Edge, or Safari.');
+                        return;
+                    }
+
+                    const recognition = new SpeechRecognition();
+                    recognition.continuous = false;
+                    recognition.interimResults = false;
+                    recognition.lang = 'en-US';
+                    recognition.maxAlternatives = 1;
+
+                    recognition.onstart = () => {
+                        setIsListening(true);
+                        setVoiceError('');
+                    };
+
+                    recognition.onresult = (event) => {
+                        const transcript = event.results[0][0].transcript;
+                        setInputValue(transcript);
+                        setIsListening(false);
+                        
+                        setTimeout(() => {
+                            if (transcript.trim()) {
+                                handleSendMessage(transcript);
+                            }
+                        }, 100);
+                    };
+
+                    recognition.onerror = (event) => {
+                        console.error('Speech recognition error:', event.error);
+                        setIsListening(false);
+                        
+                        switch(event.error) {
+                            case 'no-speech':
+                                setVoiceError('No speech detected. Try again.');
+                                break;
+                            case 'audio-capture':
+                                setVoiceError('No microphone found. Please check your microphone.');
+                                break;
+                            case 'not-allowed':
+                                setVoiceError('⚠️ Microphone permission denied. Click the 🔒 lock icon in the address bar, then allow microphone access.');
+                                break;
+                            case 'network':
+                                setVoiceError('Network error. Check your internet connection.');
+                                break;
+                            case 'aborted':
+                                setVoiceError('Voice input cancelled.');
+                                break;
+                            default:
+                                setVoiceError('Voice error: ' + event.error);
+                        }
+                    };
+
+                    recognition.onend = () => {
+                        setIsListening(false);
+                    };
+
+                    recognitionRef.current = recognition;
+                    recognition.start();
+                    
+                } catch (error) {
+                    console.error('Error starting recognition:', error);
+                    setVoiceError('⚠️ Cannot start voice input.');
+                    setIsListening(false);
+                }
+            };
+
+            const stopListening = () => {
+                if (recognitionRef.current) {
+                    try {
+                        recognitionRef.current.stop();
+                    } catch (error) {
+                        console.error('Error stopping recognition:', error);
+                    }
+                }
+                setIsListening(false);
+            };
+
+            const toggleListening = () => {
+                if (isListening) {
+                    stopListening();
+                } else {
+                    startListening();
+                }
+            };
+
+            const toggleSpeech = () => {
+                setIsSpeechEnabled(!isSpeechEnabled);
+                if (isSpeechEnabled) {
+                    window.speechSynthesis.cancel();
+                }
+            };
+
+            const addToCart = async (product) => {
+                try {
+                    const response = await fetch(`${API_URL}?path=cart/add`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ productId: product.id })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        await fetchCart();
+                        const message = `Great choice! ${product.name} has been added to your cart.`;
+                        addBotMessage(message);
+                        speak(message);
+                    }
+                } catch (error) {
+                    console.error('Error adding to cart:', error);
+                    addBotMessage('Sorry, there was an error adding the item to your cart.');
+                }
+            };
+
+            const addBotMessage = (content, quickReplies = null, products = null, filterType = null) => {
+                const newMessage = {
+                    id: Date.now(),
+                    type: 'bot',
+                    content,
+                    timestamp: new Date(),
+                    quickReplies,
+                    products,
+                    filterType
+                };
+                setMessages(prev => [...prev, newMessage]);
+            };
+
+            const sendToSeller = async (message) => {
+                if (isSending) {
+                    console.log('⚠️ Already sending - skipped');
+                    return false;
+                }
+                
+                try {
+                    setIsSending(true);
+                    console.log('📤 Sending message to seller:', message);
+                    
+                    const response = await fetch(`${API_URL}?path=conversations/send`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ 
+                            message: message,
+                            senderType: 'buyer'
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    console.log('📥 Server response:', data);
+                    
+                    if (data.success && data.conversationId) {
+                        setConversationId(data.conversationId);
+                        console.log('✅ Message sent! Conversation ID:', data.conversationId);
+                        return true;
+                    }
+                    console.error('❌ Send failed:', data);
+                    return false;
+                } catch (error) {
+                    console.error('❌ Error sending to seller:', error);
+                    return false;
+                } finally {
+                    setIsSending(false);
+                }
+            };
+
+            const handleBotResponse = async (userMessage) => {
+                setIsTyping(true);
+                
+                try {
+                    const response = await fetch(`${API_URL}?path=chat`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ message: userMessage })
+                    });
+
+                    const data = await response.json();
+                    setIsTyping(false);
+                    
+                    if (data.success) {
+                        const { content, products, filterType, quickReplies } = data.data;
+                        
+                        const updatedQuickReplies = quickReplies ? quickReplies.map(reply => 
+                            reply === 'Checkout' ? 'Chat with Seller' : reply
+                        ) : null;
+                        
+                        addBotMessage(content, updatedQuickReplies, products, filterType);
+                        speak(content);
+                    } else {
+                        addBotMessage("Sorry, I couldn't process that. Please try again.");
+                    }
+                } catch (error) {
+                    console.error('Error sending message:', error);
+                    setIsTyping(false);
+                    addBotMessage(
+                        "⚠️ Cannot connect to server.\n\n" +
+                        "Please check:\n" +
+                        "1. XAMPP/WAMP is running\n" +
+                        "2. Apache server is started\n" +
+                        "3. Files are in: C:/xampp/htdocs/shopbot/\n" +
+                        "4. Access via: http://localhost/shopbot/index.html\n\n" +
+                        "Current API: " + API_URL
+                    );
+                }
+            };
+
+            const handleSendMessage = async (message) => {
+                const textToSend = message || inputValue;
+                if (!textToSend.trim() || isSending) return;
+
+                const newMessage = {
+                    id: Date.now(),
+                    type: sellerMode ? 'buyer' : 'user',
+                    content: textToSend,
+                    timestamp: new Date()
+                };
+
+                setMessages(prev => [...prev, newMessage]);
+                
+                if (sellerMode) {
+                    await sendToSeller(textToSend);
+                } else {
+                    handleBotResponse(textToSend);
+                }
+                
+                setInputValue('');
+            };
+
+            const handleSend = () => {
+                handleSendMessage();
+            };
+
+            const handleQuickReply = (reply) => {
+                if (reply === 'Chat with Seller') {
+                    openSellerChat();
+                    return;
+                }
+                
+                const newMessage = {
+                    id: Date.now(),
+                    type: 'user',
+                    content: reply,
+                    timestamp: new Date()
+                };
+                setMessages(prev => [...prev, newMessage]);
+                handleBotResponse(reply);
+            };
+
+            const openSellerChat = async () => {
+                const cartTotal = cart.reduce((sum, item) => sum + parseFloat(item.price), 0);
+                const cartSummary = cart.map(item => `${item.name} - $${item.price}`).join('\n');
+                
+                setSellerMode(true);
+                
+                const cartMessage = `📞 Connecting you with seller...\n\nYour cart (${cart.length} items):\n${cartSummary}\n\nTotal: $${cartTotal.toFixed(2)}\n\nYou can now chat directly with the seller!`;
+                
+                addBotMessage(cartMessage, null);
+                speak('Connecting you with seller. You can now chat directly!');
+                
+                // Send initial message to seller
+                await sendToSeller(`Customer wants to discuss cart with ${cart.length} items totaling $${cartTotal.toFixed(2)}`);
+            };
+
+            const getFilterBadge = (filterType) => {
+                switch(filterType) {
+                    case 'cheapest': return <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-semibold">💰 Best Price</span>;
+                    case 'fastest': return <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-xs font-semibold">⚡ Fastest</span>;
+                    case 'best': return <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full text-xs font-semibold">⭐ Top Rated</span>;
+                    default: return null;
+                }
+            };
+
+            return (
+                <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-purple-100 to-blue-100 p-4">
+                    <div className="w-full max-w-2xl h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+                        <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-purple-600">
+                                    <ShoppingBag size={24} />
+                                </div>
+                                <div>
+                                    <h2 className="font-bold text-lg">
+                                        {sellerMode ? '🔴 Live Chat with Seller' : 'ShopBot Voice'}
+                                    </h2>
+                                    <p className="text-xs text-purple-100">
+                                        {sellerMode ? 'Real-time conversation' : `📍 Cikarang • 🎤 Voice • ${apiConnected ? '🟢 Connected' : '🔴 Disconnected'}`}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={toggleSpeech}
+                                    className={`p-2 rounded-full transition-all ${
+                                        isSpeechEnabled ? 'bg-white text-purple-600' : 'bg-purple-800 text-white'
+                                    }`}
+                                    title={isSpeechEnabled ? 'Disable voice output' : 'Enable voice output'}
+                                >
+                                    {isSpeechEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                                </button>
+                                {cart.length > 0 && (
+                                    <div className="bg-white text-purple-600 px-3 py-1 rounded-full text-sm font-semibold">
+                                        {cart.length}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                            {messages.map((message) => (
+                                <div key={message.id}>
+                                    <div className={`flex ${(message.type === 'user' || message.type === 'buyer') ? 'justify-end' : 'justify-start'}`}>
+                                        <div
+                                            className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                                                message.type === 'user' || message.type === 'buyer'
+                                                    ? 'bg-purple-600 text-white rounded-br-none'
+                                                    : message.type === 'seller'
+                                                    ? 'bg-green-600 text-white rounded-bl-none'
+                                                    : 'bg-white text-gray-800 shadow-md rounded-bl-none'
+                                            }`}
+                                        >
+                                            {message.type === 'seller' && (
+                                                <p className="text-xs font-semibold mb-1 opacity-80">👤 Seller</p>
+                                            )}
+                                            <p className="whitespace-pre-line">{message.content}</p>
+                                            <span className="text-xs opacity-70 mt-1 block">
+                                                {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {message.products && (
+                                        <div className="mt-3 space-y-3">
+                                            {message.filterType && (
+                                                <div className="flex justify-center">
+                                                    {getFilterBadge(message.filterType)}
+                                                </div>
+                                            )}
+                                            {message.products.map((product) => (
+                                                <div key={product.id} className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow">
+                                                    <div className="flex items-start gap-4">
+                                                        <div className="text-5xl">{product.image}</div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <h3 className="font-semibold text-gray-800">{product.name}</h3>
+                                                            <div className="flex items-center gap-1 mt-1">
+                                                                <span className="text-yellow-500"><Star size={14} filled={true} /></span>
+                                                                <span className="text-sm font-semibold text-gray-700">{product.rating}</span>
+                                                                <span className="text-xs text-gray-500">({product.reviews})</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 mt-2 text-xs text-gray-600">
+                                                                <span>📦 {product.warehouse}</span>
+                                                                <span>•</span>
+                                                                <span>🚚 {product.deliveryDays}d</span>
+                                                                <span>•</span>
+                                                                <span>📊 Stock: {product.stock}</span>
+                                                            </div>
+                                                            <div className="flex items-center justify-between mt-3">
+                                                                <p className="text-purple-600 font-bold text-lg">${product.price}</p>
+                                                                <button
+                                                                    onClick={() => addToCart(product)}
+                                                                    className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+                                                                >
+                                                                    Add to Cart
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {message.quickReplies && !sellerMode && (
+                                        <div className="flex flex-wrap gap-2 mt-3">
+                                            {message.quickReplies.map((reply, idx) => (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => handleQuickReply(reply)}
+                                                    className="bg-white border-2 border-purple-600 text-purple-600 px-4 py-2 rounded-full hover:bg-purple-600 hover:text-white transition-all text-sm font-medium shadow-sm"
+                                                >
+                                                    {reply}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+
+                            {isTyping && (
+                                <div className="flex justify-start">
+                                    <div className="bg-white rounded-2xl rounded-bl-none px-4 py-3 shadow-md">
+                                        <div className="flex gap-1">
+                                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            <div ref={messagesEndRef} />
+                        </div>
+
+                        <div className="p-4 bg-white border-t border-gray-200">
+                            <div className="flex gap-2">
+                                {!sellerMode && (
+                                    <button
+                                        onClick={toggleListening}
+                                        disabled={isTyping || isSending}
+                                        className={`p-3 rounded-full transition-all shadow-lg ${
+                                            isListening 
+                                                ? 'bg-red-500 text-white animate-pulse' 
+                                                : (isTyping || isSending)
+                                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                : 'bg-purple-600 text-white hover:bg-purple-700'
+                                        }`}
+                                        title={isListening ? 'Stop listening' : 'Start voice input'}
+                                    >
+                                        {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+                                    </button>
+                                )}
+                                <input
+                                    type="text"
+                                    value={inputValue}
+                                    onChange={(e) => setInputValue(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && !isSending && handleSend()}
+                                    placeholder={sellerMode ? "Type message to seller..." : isListening ? "Listening..." : "Type or speak..."}
+                                    disabled={isListening || isSending}
+                                    className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-full focus:outline-none focus:border-purple-600 transition-colors disabled:bg-gray-100"
+                                />
+                                <button
+                                    onClick={handleSend}
+                                    disabled={isListening || isTyping || isSending}
+                                    className="bg-purple-600 text-white p-3 rounded-full hover:bg-purple-700 transition-colors shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                >
+                                    <Send size={20} />
+                                </button>
+                            </div>
+                            {isListening && (
+                                <p className="text-xs text-center text-purple-600 mt-2 animate-pulse font-semibold">🎤 Listening... Speak now!</p>
+                            )}
+                            {voiceError && (
+                                <p className="text-xs text-center text-red-600 mt-2">{voiceError}</p>
+                            )}
+                            {sellerMode && (
+                                <p className="text-xs text-center text-green-600 mt-2 font-semibold">🔴 Connected to seller - Messages sent in real-time</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<ShopChatbot />);
+    </script>
+</body>
+</html>
