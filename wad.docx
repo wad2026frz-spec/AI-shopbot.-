@@ -1,0 +1,1792 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarketChat</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --purple:#6c3fe0;--purple2:#8b5cf6;--purple-light:#ede9fe;
+  --seller:#f59e0b;--seller2:#fcd34d;
+  --green:#22c55e;--red:#e05c5c;
+  --bg:#eaebf5;--white:#fff;--text:#1a1a2e;--muted:#9090a8;--border:#e2e2ec;
+}
+body{font-family:'Inter',sans-serif;background:linear-gradient(135deg,#dde0f5,#ece8fb);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+
+/* ===== AUTH SCREEN ===== */
+.auth-screen{width:100%;max-width:420px;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.auth-card{background:var(--white);border-radius:24px;box-shadow:0 16px 60px rgba(108,63,224,.18);overflow:hidden}
+.auth-header{padding:28px 28px 20px;text-align:center}
+.auth-logo{font-size:2.5rem;margin-bottom:8px}
+.auth-title{font-size:1.3rem;font-weight:700;color:var(--text)}
+.auth-sub{font-size:.83rem;color:var(--muted);margin-top:4px}
+
+.auth-tabs{display:flex;border-bottom:1px solid var(--border)}
+.auth-tab{flex:1;padding:12px;border:none;background:transparent;font-family:'Inter',sans-serif;font-size:.85rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.auth-tab.on{color:var(--purple);border-bottom-color:var(--purple)}
+
+.auth-body{padding:24px 28px 28px}
+.role-pick{display:flex;gap:10px;margin-bottom:16px}
+.role-card{flex:1;padding:14px 10px;border-radius:14px;border:2px solid var(--border);cursor:pointer;text-align:center;transition:all .2s}
+.role-card:hover{border-color:var(--purple)}
+.role-card.on-buyer{border-color:var(--purple);background:var(--purple-light)}
+.role-card.on-seller{border-color:var(--seller);background:#fff9ec}
+.role-card .rc-icon{font-size:1.8rem;display:block;margin-bottom:6px}
+.role-card .rc-label{font-size:.8rem;font-weight:700;color:var(--text)}
+.role-card .rc-desc{font-size:.7rem;color:var(--muted);margin-top:2px}
+
+.auth-label{font-size:.75rem;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;margin-top:14px}
+.auth-input{width:100%;padding:10px 13px;border-radius:10px;border:1.5px solid var(--border);outline:none;font-family:'Inter',sans-serif;font-size:.86rem;color:var(--text);transition:border-color .18s}
+.auth-input:focus{border-color:var(--purple)}
+.auth-btn{width:100%;padding:13px;border-radius:12px;border:none;font-family:'Inter',sans-serif;font-size:.92rem;font-weight:700;cursor:pointer;margin-top:18px;transition:opacity .18s}
+.auth-btn:hover{opacity:.88}
+.auth-btn-buyer{background:linear-gradient(135deg,var(--purple),var(--purple2));color:#fff}
+.auth-btn-seller{background:linear-gradient(135deg,#c97a00,var(--seller));color:#fff}
+.auth-err{background:#fee2e2;color:#991b1b;border-radius:10px;padding:9px 12px;font-size:.8rem;margin-top:12px;display:none}
+.auth-or{text-align:center;font-size:.78rem;color:var(--muted);margin:14px 0;position:relative}
+.auth-or::before,.auth-or::after{content:'';position:absolute;top:50%;width:38%;height:1px;background:var(--border)}
+.auth-or::before{left:0}.auth-or::after{right:0}
+.auth-guest{width:100%;padding:10px;border-radius:12px;border:1.5px solid var(--border);background:transparent;font-family:'Inter',sans-serif;font-size:.85rem;font-weight:600;color:var(--muted);cursor:pointer;transition:all .18s}
+.auth-guest:hover{border-color:var(--purple);color:var(--purple)}
+
+/* ===== MAIN APP ===== */
+.app-screen{width:100%;max-width:680px;height:90vh;max-height:820px;display:none;flex-direction:column;background:var(--white);border-radius:24px;box-shadow:0 16px 60px rgba(108,63,224,.18);overflow:hidden;position:relative}
+.app-screen.seller-view{max-width:980px}
+.app-shell{flex:1;min-height:0;display:flex;flex-direction:column}
+.chat-col{flex:1;min-height:0;display:flex;flex-direction:column}
+.seller-side{display:none;min-width:0;border-left:1px solid rgba(0,0,0,.06);background:linear-gradient(180deg,#fcf8f0,#f7f4ff);padding:14px;overflow-y:auto}
+.seller-side::-webkit-scrollbar{width:4px}
+.seller-side::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.app-screen.seller-view .app-shell{flex-direction:row;align-items:stretch}
+.app-screen.seller-view .seller-side{display:flex;flex-direction:column;gap:10px;width:300px}
+.app-screen.seller-view .seller-side .ai-reco{display:flex;flex-direction:column;padding:0;background:transparent;border-top:none;gap:10px}
+.app-screen.seller-view .seller-side .ai-reco .ai-reco-title{width:auto}
+.app-screen.seller-view .seller-side .ai-reco .ai-chip{width:100%;text-align:left;white-space:normal;line-height:1.35}
+.app-screen.seller-view .seller-side .ai-reco .ai-muted{margin-bottom:2px}
+
+@media(max-width:860px){
+  .app-screen.seller-view .app-shell{flex-direction:column}
+  .app-screen.seller-view .seller-side{width:100%;border-left:none;border-top:1px solid rgba(0,0,0,.06);max-height:240px}
+}
+
+/* HEADER */
+.header{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.header.hb{background:linear-gradient(135deg,#5b2fd4,var(--purple2))}
+.header.hs{background:linear-gradient(135deg,#c97a00,var(--seller))}
+.hlogo{width:44px;height:44px;border-radius:13px;background:rgba(255,255,255,.22);border:2px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-size:1.3rem;overflow:hidden;flex-shrink:0}
+.hlogo img{width:100%;height:100%;object-fit:cover;border-radius:11px}
+.hinfo{flex:1;margin-left:11px}
+.hname{font-size:.98rem;font-weight:700;color:#fff}
+.hstatus{font-size:.72rem;color:rgba(255,255,255,.75);margin-top:2px;display:flex;align-items:center;gap:5px}
+.hdot{width:6px;height:6px;border-radius:50%;background:#4ade80;display:inline-block}
+.hbtns{display:flex;gap:8px}
+.hbtn{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.18);border:none;color:#fff;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:background .18s}
+.hbtn:hover{background:rgba(255,255,255,.3)}
+
+/* ROLE STRIP */
+.role-strip{padding:7px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;transition:background .2s ease,border-color .2s ease}
+.role-strip.hb{background:linear-gradient(90deg,rgba(108,63,224,.10),rgba(108,63,224,.04));border-bottom:1px solid rgba(108,63,224,.12)}
+.role-strip.hs{background:linear-gradient(90deg,rgba(201,122,0,.12),rgba(201,122,0,.05));border-bottom:1px solid rgba(201,122,0,.12)}
+.rs-info{font-size:.75rem;color:var(--text);font-weight:500}
+.rs-logout{padding:4px 14px;border-radius:50px;border:1.5px solid rgba(0,0,0,.10);background:rgba(255,255,255,.45);color:var(--text);font-family:'Inter',sans-serif;font-size:.74rem;font-weight:600;cursor:pointer;transition:all .2s}
+.rs-logout:hover{background:rgba(255,255,255,.8)}
+
+/* MESSAGES */
+.mwrap{flex:1;overflow-y:auto;padding:18px 20px 10px;background:#f5f5fb;display:flex;flex-direction:column;gap:3px}
+.mwrap::-webkit-scrollbar{width:4px}
+.mwrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.dsep{text-align:center;font-size:.7rem;color:var(--muted);margin:4px 0 10px;position:relative}
+.dsep::before,.dsep::after{content:'';position:absolute;top:50%;width:28%;height:1px;background:var(--border)}
+.dsep::before{left:4%}.dsep::after{right:4%}
+.mrow{display:flex;align-items:flex-end;gap:7px;margin-bottom:2px}
+.mrow.me{flex-direction:row-reverse}
+.mav{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:700;flex-shrink:0;overflow:hidden}
+.mav img{width:100%;height:100%;object-fit:cover}
+.avb{background:linear-gradient(135deg,var(--purple),var(--purple2));color:#fff}
+.avs{background:linear-gradient(135deg,var(--seller),var(--seller2));color:#7c3a00}
+.bbl{max-width:65%;padding:11px 14px;border-radius:20px;font-size:.87rem;line-height:1.55;word-break:break-word;animation:pop .17s ease}
+@keyframes pop{from{opacity:0;transform:scale(.93) translateY(5px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.bbl.them{background:var(--white);color:var(--text);border-bottom-left-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.bbl.meb{background:var(--purple);color:#fff;border-bottom-right-radius:4px}
+.bbl.mes{background:var(--seller);color:#fff;border-bottom-right-radius:4px}
+.bt{font-size:.65rem;opacity:.6;margin-top:4px;display:block}
+.bbl.them .bt{text-align:left}.bbl.meb .bt,.bbl.mes .bt{text-align:right}
+
+/* Image bubble */
+.imgbbl{max-width:220px;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.1);animation:pop .17s ease;cursor:pointer}
+.imgbbl img{width:100%;display:block}
+
+/* Product bubble */
+.pbbl{max-width:220px;background:var(--white);border-radius:16px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.09);animation:pop .17s ease}
+.pbbl.mine{background:#ede9fe;border:1.5px solid rgba(108,63,224,.2)}
+.pbbl-img{padding:18px;text-align:center;font-size:2.6rem;background:#f8f7ff}
+.pbbl-info{padding:9px 13px 11px}
+.pbbl-nm{font-size:.83rem;font-weight:600;color:var(--text);margin-bottom:3px}
+.pbbl-pr{font-size:.9rem;font-weight:700;color:var(--purple)}
+.pbbl-btn{width:100%;padding:9px;background:var(--purple);color:#fff;border:none;font-family:'Inter',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;transition:opacity .18s}
+.pbbl-btn:hover{opacity:.88}
+
+/* Offer bubble */
+.obbl{max-width:255px;background:var(--white);border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.09);border:2px solid var(--seller);animation:pop .17s ease}
+.obbl.mine{background:#fff9ec}
+.obbl-hd{background:linear-gradient(135deg,#c97a00,var(--seller));padding:9px 13px;display:flex;align-items:center;gap:8px}
+.obbl-hd span{font-size:.76rem;font-weight:700;color:#fff;letter-spacing:.4px}
+.obbl-badge{background:rgba(255,255,255,.25);border-radius:50px;padding:2px 9px;font-size:.68rem;font-weight:700;color:#fff}
+.obbl-body{padding:11px 13px}
+.obbl-name{font-size:.88rem;font-weight:700;color:var(--text);margin-bottom:3px}
+.obbl-desc{font-size:.76rem;color:var(--muted);margin-bottom:7px;line-height:1.45}
+.obbl-prices{display:flex;align-items:center;gap:7px;margin-bottom:9px}
+.obbl-ori{font-size:.76rem;color:var(--muted);text-decoration:line-through}
+.obbl-price{font-size:1rem;font-weight:700;color:var(--seller)}
+.obbl-disc{background:#fef3c7;color:#92400e;border-radius:50px;padding:2px 7px;font-size:.68rem;font-weight:700}
+.obbl-acts{display:flex;gap:7px}
+.obbl-accept{flex:1;padding:8px;background:var(--seller);color:#fff;border:none;border-radius:9px;font-family:'Inter',sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;transition:opacity .18s}
+.obbl-accept:hover{opacity:.88}
+.obbl-accept.ok{background:var(--green);cursor:default}
+.obbl-decline{padding:8px 11px;background:transparent;color:var(--muted);border:1.5px solid var(--border);border-radius:9px;font-family:'Inter',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;transition:all .18s}
+.obbl-decline:hover{border-color:var(--red);color:var(--red)}
+.obbl-time{font-size:.63rem;color:var(--muted);display:block;padding:3px 13px 9px;text-align:right}
+
+/* QUICK REPLIES */
+.qrbar{padding:8px 20px 4px;background:#f5f5fb;display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0}
+.qr{padding:7px 15px;border-radius:50px;border:1.5px solid var(--purple);color:var(--purple);background:var(--white);font-family:'Inter',sans-serif;font-size:.78rem;font-weight:600;cursor:pointer;transition:all .18s;white-space:nowrap}
+.qr:hover{background:var(--purple);color:#fff}
+.qr.s{border-color:var(--seller);color:var(--seller)}
+.qr.s:hover{background:var(--seller);color:#fff}
+
+/* AI insight bar */
+.ai-reco{padding:8px 20px 4px;background:#f5f5fb;display:none;flex-wrap:wrap;gap:7px;border-top:1px dashed rgba(0,0,0,.06)}
+.ai-reco-title{width:100%;font-size:.72rem;font-weight:700;color:#92400e;letter-spacing:.3px}
+.ai-chip{padding:7px 12px;border:none;border-radius:50px;background:#fff3de;color:#92400e;font-family:'Inter',sans-serif;font-size:.74rem;font-weight:600;cursor:pointer;transition:all .18s}
+.ai-chip:hover{background:#f59e0b;color:#fff}
+.ai-muted{font-size:.73rem;color:var(--muted)}
+
+/* Tiny cue under buyer chat */
+.mini-suggest{display:inline-flex;align-items:center;gap:6px;margin-top:5px;padding:5px 10px;border-radius:999px;background:#fff3de;color:#92400e;font-size:.7rem;font-weight:700;cursor:pointer;border:1px solid rgba(245,158,11,.25);box-shadow:0 1px 6px rgba(0,0,0,.05)}
+.mini-suggest:hover{background:#fde68a}
+
+/* INPUT */
+.ibar{padding:8px 18px 16px;background:#f5f5fb;flex-shrink:0}
+.ipill{display:flex;align-items:center;gap:8px;background:var(--white);border-radius:50px;padding:7px 7px 7px 14px;box-shadow:0 2px 14px rgba(0,0,0,.09);border:1.5px solid transparent;transition:border-color .2s}
+.ipill:focus-within{border-color:var(--purple)}
+.ipill:focus-within.sp{border-color:var(--seller)}
+#msgi{flex:1;border:none;outline:none;background:transparent;font-family:'Inter',sans-serif;font-size:.87rem;color:var(--text);resize:none;max-height:80px;line-height:1.5;padding:5px 3px}
+#msgi::placeholder{color:#bbb}
+.pb{width:40px;height:40px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem;transition:transform .18s;flex-shrink:0}
+.pb:hover{transform:scale(1.08)}
+.mic{background:var(--purple);color:#fff}
+.mic.s{background:var(--seller)}
+.snd{background:var(--purple);color:#fff}
+.snd.s{background:var(--seller)}
+.emo{background:transparent;color:var(--muted)}
+.emo:hover{color:var(--purple);transform:none}
+
+/* MODALS */
+.kw { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; font-weight: 600; text-decoration-color: rgba(255,255,255,0.8); }
+.bbl.them .kw { text-decoration-color: var(--purple); color: var(--purple); }
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:400;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{background:var(--white);border-radius:22px;width:380px;max-width:92vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 16px 60px rgba(0,0,0,.2);animation:slideUp .22s ease;overflow:hidden}
+@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.modal-hd{padding:17px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid var(--border)}
+.modal-hd h3{font-size:.98rem;font-weight:700;color:var(--text)}
+.modal-hd.seller-hd{background:linear-gradient(135deg,#c97a00,var(--seller))}
+.modal-hd.seller-hd h3{color:#fff}
+.modal-close{width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,.08);border:none;font-size:.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .18s}
+.modal-close:hover{background:rgba(0,0,0,.15)}
+.modal-close.wh{background:rgba(255,255,255,.2);color:#fff}
+.modal-close.wh:hover{background:rgba(255,255,255,.35)}
+.modal-body{overflow-y:auto;flex:1;padding:16px 20px}
+.modal-body::-webkit-scrollbar{width:3px}
+.modal-body::-webkit-scrollbar-thumb{background:var(--border)}
+.mlabel{font-size:.75rem;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;margin-top:13px}
+.minput{width:100%;padding:9px 12px;border-radius:10px;border:1.5px solid var(--border);outline:none;font-family:'Inter',sans-serif;font-size:.85rem;color:var(--text);transition:border-color .18s}
+.minput:focus{border-color:var(--seller)}
+.mtextarea{resize:none;height:64px;line-height:1.5}
+.mrow2{display:flex;gap:10px}
+.mrow2>div{flex:1}
+.mfooter{display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--border);flex-shrink:0}
+.mbtn{flex:1;padding:11px;border-radius:12px;border:none;font-family:'Inter',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;transition:opacity .18s}
+.mbtn:hover{opacity:.88}
+.mbtn-seller{background:var(--seller);color:#fff}
+.mbtn-buyer{background:var(--purple);color:#fff}
+.mbtn-cancel{background:transparent;color:var(--muted);border:1.5px solid var(--border);flex:0 0 auto;padding:11px 16px}
+.mbtn-cancel:hover{border-color:var(--muted)}
+
+/* Photo upload */
+.pu-area{border:2px dashed var(--border);border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:all .18s;margin-top:4px;position:relative}
+.pu-area:hover{border-color:var(--seller);background:#fff9ec}
+.pu-area input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.pu-icon{font-size:1.7rem;display:block;margin-bottom:3px}
+.pu-lbl{font-size:.76rem;color:var(--muted);font-weight:500}
+.pu-prev{width:100%;border-radius:9px;margin-top:8px;display:none;max-height:150px;object-fit:cover}
+
+/* Store profile circle */
+.sp-circle{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#c97a00,var(--seller));display:flex;align-items:center;justify-content:center;font-size:2rem;cursor:pointer;overflow:hidden;border:3px solid var(--seller);transition:opacity .18s;margin:0 auto}
+.sp-circle:hover{opacity:.85}
+.sp-circle img{width:100%;height:100%;object-fit:cover}
+
+/* Buyer store view */
+.store-view-hero{height:100px;position:relative;background:linear-gradient(135deg,#5b2fd4,var(--purple2));flex-shrink:0}
+.store-view-hero img.hero-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.4}
+.store-view-av{position:absolute;bottom:-28px;left:20px;width:64px;height:64px;border-radius:50%;border:3px solid var(--white);overflow:hidden;background:linear-gradient(135deg,#c97a00,var(--seller));display:flex;align-items:center;justify-content:center;font-size:1.6rem}
+.store-view-av img{width:100%;height:100%;object-fit:cover}
+.store-view-info{padding:36px 20px 18px}
+.store-view-name{font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:3px}
+.store-view-desc{font-size:.8rem;color:var(--muted);margin-bottom:14px;line-height:1.5}
+.wa-btn{width:100%;padding:13px;border-radius:14px;background:linear-gradient(135deg,#25d366,#1db954);color:#fff;border:none;font-family:'Inter',sans-serif;font-size:.93rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;transition:opacity .18s;box-shadow:0 4px 16px rgba(37,211,102,.3)}
+.wa-btn:hover{opacity:.9}
+.no-wa{text-align:center;padding:10px;font-size:.8rem;color:var(--muted)}
+
+/* Order History */
+.oh-tabs{display:flex;padding:10px 14px 0;gap:5px;flex-shrink:0;border-bottom:1px solid var(--border);overflow-x:auto}
+.oh-tab{padding:6px 14px;border-radius:50px 50px 0 0;border:none;font-family:'Inter',sans-serif;font-size:.76rem;font-weight:600;cursor:pointer;background:transparent;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.oh-tab.on{color:var(--purple);border-bottom-color:var(--purple);background:#f5f3ff}
+.oh-empty{text-align:center;padding:36px 0;color:var(--muted)}
+.oh-ei{font-size:2.8rem;display:block;margin-bottom:8px}
+.oh-card{background:var(--bg);border-radius:13px;padding:13px;margin-bottom:9px;border:1.5px solid transparent;transition:border-color .18s}
+.oh-card:hover{border-color:var(--purple)}
+.oh-card-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px}
+.oh-card-em{font-size:1.8rem;flex-shrink:0}
+.oh-card-info{flex:1}
+.oh-card-nm{font-size:.86rem;font-weight:700;color:var(--text);margin-bottom:2px}
+.oh-card-pr{font-size:.83rem;font-weight:700;color:var(--purple)}
+.oh-card-ds{font-size:.72rem;color:var(--muted);margin-top:2px}
+.oh-stat{display:inline-flex;align-items:center;padding:3px 9px;border-radius:50px;font-size:.7rem;font-weight:700}
+.s-pending{background:#fef3c7;color:#92400e}
+.s-confirmed{background:#d1fae5;color:#065f46}
+.s-shipped{background:#dbeafe;color:#1e40af}
+.s-done{background:#ede9fe;color:#5b21b6}
+.s-cancelled{background:#fee2e2;color:#991b1b}
+.oh-card-bot{display:flex;align-items:center;justify-content:space-between;margin-top:9px}
+.oh-card-time{font-size:.69rem;color:var(--muted)}
+.oh-card-acts{display:flex;gap:5px}
+.oh-act{padding:5px 11px;border-radius:8px;border:1.5px solid var(--border);background:var(--white);font-family:'Inter',sans-serif;font-size:.73rem;font-weight:600;color:var(--muted);cursor:pointer;transition:all .18s}
+.oh-act:hover{border-color:var(--purple);color:var(--purple)}
+.oh-act.danger:hover{border-color:var(--red);color:var(--red)}
+
+/* Buy quantity modal */
+.qty-preview{margin-top:10px;padding:12px 14px;border-radius:12px;background:#fff7e6;border:1.5px solid rgba(245,158,11,.18)}
+.qty-preview-label{font-size:.72rem;font-weight:700;color:#92400e;letter-spacing:.3px;text-transform:uppercase}
+.qty-preview-total{font-size:1.05rem;font-weight:800;color:var(--seller);margin-top:4px}
+.qty-preview-note{font-size:.76rem;color:var(--muted);margin-top:4px;line-height:1.45}
+
+/* Lightbox */
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:600;cursor:zoom-out}
+.lightbox img{max-width:90vw;max-height:88vh;border-radius:12px}
+
+/* Toast */
+.toast{position:fixed;bottom:22px;right:22px;background:#1a1a2e;color:#fff;border-radius:13px;padding:11px 18px;font-size:.81rem;z-index:700;box-shadow:0 4px 20px rgba(0,0,0,.2);animation:slideUp .25s ease}
+
+/* Loading */
+.loading-screen{position:fixed;inset:0;background:linear-gradient(135deg,#dde0f5,#ece8fb);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:800}
+.loading-screen .sp{width:40px;height:40px;border:3px solid rgba(108,63,224,.2);border-top-color:var(--purple);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-screen p{font-size:.9rem;color:var(--muted)}
+
+/* Cookie consent */
+.cookie-bar{position:fixed;left:16px;right:16px;bottom:16px;background:var(--white);border:1.5px solid var(--border);border-radius:16px;box-shadow:0 12px 28px rgba(0,0,0,.15);padding:14px;z-index:900;display:none}
+.cookie-title{font-size:.9rem;font-weight:700;color:var(--text)}
+.cookie-desc{font-size:.78rem;color:var(--muted);line-height:1.5;margin-top:4px}
+.cookie-actions{display:flex;gap:8px;margin-top:12px}
+.cookie-btn{padding:9px 12px;border-radius:10px;border:none;font-family:'Inter',sans-serif;font-size:.8rem;font-weight:700;cursor:pointer}
+.cookie-btn.accept{background:var(--purple);color:#fff}
+.cookie-btn.reject{background:transparent;color:var(--muted);border:1.5px solid var(--border)}
+
+@media(max-width:500px){.app-screen,.auth-screen{border-radius:0;height:100vh;max-height:100vh}body{padding:0}}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-screen" id="loadingScreen">
+  <div style="font-size:2.5rem">🛍️</div>
+  <div class="sp"></div>
+  <p>Memuat MarketChat...</p>
+</div>
+
+<!-- COOKIE CONSENT -->
+<div class="cookie-bar" id="cookieBar">
+  <div class="cookie-title">Cookie Preferences</div>
+  <div class="cookie-desc">Kami menggunakan cookie untuk menyimpan pilihan role terakhir dan preferensi dasar penggunaan aplikasi.</div>
+  <div class="cookie-actions">
+    <button class="cookie-btn accept" onclick="acceptCookies()">Terima</button>
+    <button class="cookie-btn reject" onclick="rejectCookies()">Tolak</button>
+  </div>
+</div>
+
+<!-- AUTH SCREEN -->
+<div class="auth-screen" id="authScreen" style="display:none">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-logo">🛍️</div>
+      <div class="auth-title">MarketChat</div>
+      <div class="auth-sub">Platform jual beli dengan chat real-time</div>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab on" id="tabLogin" onclick="switchAuthTab('login')">Masuk</button>
+      <button class="auth-tab" id="tabReg" onclick="switchAuthTab('register')">Daftar</button>
+    </div>
+    <div class="auth-body">
+      <!-- Role pick -->
+      <div class="role-pick">
+        <div class="role-card on-buyer" id="rcBuyer" onclick="pickRole('buyer')">
+          <span class="rc-icon">🛒</span>
+          <div class="rc-label">Buyer</div>
+          <div class="rc-desc">Belanja produk</div>
+        </div>
+        <div class="role-card" id="rcSeller" onclick="pickRole('seller')">
+          <span class="rc-icon">🏪</span>
+          <div class="rc-label">Seller</div>
+          <div class="rc-desc">Jual produk</div>
+        </div>
+      </div>
+      <!-- Store name (seller register only) -->
+      <div id="storeNameWrap" style="display:none">
+        <label class="auth-label">Nama Toko</label>
+        <input class="auth-input" id="storeNameInput" type="text" placeholder="cth. Toko Elektro Jaya">
+      </div>
+      <label class="auth-label">Email</label>
+      <input class="auth-input" id="emailInput" type="email" placeholder="email@kamu.com">
+      <label class="auth-label">Password</label>
+      <input class="auth-input" id="passInput" type="password" placeholder="Minimal 6 karakter">
+      <div class="auth-err" id="authErr"></div>
+      <button class="auth-btn auth-btn-buyer" id="authBtn" onclick="doAuth()">Masuk sebagai Buyer</button>
+      <div class="auth-or">atau</div>
+      <button class="auth-guest" onclick="guestLogin()">👤 Lanjut sebagai Tamu (Buyer)</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="app-screen" id="appScreen">
+
+  <!-- HEADER -->
+  <div class="header hb" id="hdr">
+    <div class="hlogo" id="hlogo">🛍️</div>
+    <div class="hinfo">
+      <div class="hname" id="hname">MarketChat</div>
+      <div class="hstatus"><span class="hdot"></span><span id="hstxt">Buyer</span></div>
+    </div>
+    <div class="hbtns">
+      <button class="hbtn" id="histBtn" onclick="openModal('ohModal')" title="Riwayat Pesanan">📋</button>
+      <button class="hbtn" id="addrBtn" onclick="openModal('addrModal')" title="Alamat Saya">📍</button>
+      <button class="hbtn" id="phoneBtn" onclick="openStoreView()" title="Hubungi Toko">📞</button>
+      <button class="hbtn" id="storeBtn" onclick="openModal('spModal')" title="Profil Toko" style="display:none">🏪</button>
+      <button class="hbtn" id="offerBtn" onclick="openModal('offerModal')" title="Buat Penawaran" style="display:none">🏷️</button>
+      <button class="hbtn" id="pkgBtn" onclick="toggleProdPanel()" title="Produk" style="display:none">📦</button>
+    </div>
+  </div>
+
+  <!-- ROLE STRIP -->
+  <div class="role-strip" id="roleStrip">
+    <span class="rs-info" id="rsInfo">👤 Masuk sebagai Buyer</span>
+    <button class="rs-logout" onclick="doLogout()">Keluar</button>
+  </div>
+
+  <div class="app-shell">
+    <div class="chat-col">
+      <!-- MESSAGES -->
+      <div class="mwrap" id="mw"></div>
+
+      <!-- QUICK REPLIES -->
+      <div class="qrbar" id="qrb"></div>
+
+      <!-- INPUT -->
+      <div class="ibar">
+        <div class="ipill" id="pill">
+          <button class="pb mic" id="micB">🎤</button>
+          <textarea id="msgi" rows="1" placeholder="Ketik pesan..." onkeydown="hkey(event)" oninput="ares(this)"></textarea>
+          <button class="pb emo" onclick="addE()">😊</button>
+          <button class="pb emo" id="photoBtn" onclick="document.getElementById('photoInput').click()" style="display:none" title="Foto">📷</button>
+          <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="sendPhoto(event)">
+          <button class="pb snd" id="sndB" onclick="send()">➤</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SELLER AI RECOMMENDATIONS -->
+    <aside class="seller-side" id="sellerSide">
+      <div class="ai-reco" id="aiRecoBar"></div>
+    </aside>
+  </div>
+</div>
+
+<!-- PRODUCT PANEL -->
+<div id="prodPanel" style="display:none;position:fixed;top:50%;right:16px;transform:translateY(-50%);width:190px;background:var(--white);border-radius:18px;box-shadow:0 8px 32px rgba(0,0,0,.14);overflow:hidden;z-index:100">
+  <div style="padding:11px 12px 8px;font-size:.68rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px">
+    <span>📦 Produkku</span>
+    <button class="hbtn" id="addProdBtn" onclick="openModal('addProdModal')" title="Tambah Barang" style="width:26px;height:26px;background:var(--purple);font-size:.9rem">＋</button>
+  </div>
+  <div id="ppl" style="overflow-y:auto;max-height:400px"></div>
+</div>
+
+<!-- OFFER MODAL -->
+<div class="overlay" id="offerModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-hd seller-hd">
+      <h3>🏷️ Buat Penawaran</h3>
+      <button class="modal-close wh" onclick="closeModal('offerModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="pu-area" id="ofPuArea">
+        <input type="file" accept="image/*" onchange="prevPhoto(event,'ofPrev','ofPuIcon','ofPuLbl')" onclick="event.stopPropagation()">
+        <span class="pu-icon" id="ofPuIcon">📷</span>
+        <span class="pu-lbl" id="ofPuLbl">Upload foto produk (opsional)</span>
+        <img class="pu-prev" id="ofPrev">
+      </div>
+      <label class="mlabel">Nama Produk *</label>
+      <input class="minput" id="ofNm" type="text" placeholder="cth. Earphone Pro X">
+      <label class="mlabel">Deskripsi</label>
+      <textarea class="minput mtextarea" id="ofDesc" placeholder="Garansi 1 tahun, gratis softcase..."></textarea>
+      <div class="mrow2">
+        <div><label class="mlabel">Harga Normal</label><input class="minput" id="ofOri" type="text" placeholder="350.000"></div>
+        <div><label class="mlabel">Harga Penawaran *</label><input class="minput" id="ofPrice" type="text" placeholder="285.000"></div>
+      </div>
+    </div>
+    <div class="mfooter">
+      <button class="mbtn mbtn-cancel" onclick="closeModal('offerModal')">Batal</button>
+      <button class="mbtn mbtn-seller" onclick="sendOffer()">Kirim Penawaran 🏷️</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD PRODUCT MODAL (seller) -->
+<div class="overlay" id="addProdModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-hd seller-hd">
+      <h3 id="npTitle">📦 Tambah Barang</h3>
+      <button class="modal-close wh" onclick="closeModal('addProdModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <label class="mlabel">Nama Barang *</label>
+      <input class="minput" id="npName" type="text" placeholder="cth. Charger Fast 33W">
+      <label class="mlabel">Foto Barang</label>
+      <div class="pu-area" id="npPuArea">
+        <input type="file" accept="image/*" onchange="uploadProductPhoto(event)" onclick="event.stopPropagation()">
+        <span class="pu-icon" id="npPuIcon">🖼️</span>
+        <span class="pu-lbl" id="npPuLbl">Klik untuk upload foto barang</span>
+        <img class="pu-prev" id="npPrev">
+      </div>
+      <label class="mlabel">Stok</label>
+      <input class="minput" id="npStock" type="text" placeholder="20 pcs">
+      <label class="mlabel">Harga *</label>
+      <input class="minput" id="npPrice" type="text" placeholder="Rp 120.000">
+    </div>
+    <div class="mfooter">
+      <button class="mbtn mbtn-cancel" id="npDeleteBtn" style="display:none" onclick="deleteCurrentProduct()">Hapus</button>
+      <button class="mbtn mbtn-cancel" onclick="closeModal('addProdModal')">Batal</button>
+      <button class="mbtn mbtn-seller" id="npSaveBtn" onclick="saveNewProduct()">Simpan Barang ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- STORE PROFILE MODAL (seller edit) -->
+<div class="overlay" id="spModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-hd seller-hd">
+      <h3>🏪 Profil Toko</h3>
+      <button class="modal-close wh" onclick="closeModal('spModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="text-align:center;margin-bottom:8px">
+        <div class="sp-circle" id="spCircle" onclick="document.getElementById('spPhotoInput').click()">
+          <img id="spPhotoImg" src="" style="display:none;width:100%;height:100%;object-fit:cover">
+          <span id="spPhotoIcon">🏪</span>
+        </div>
+        <input type="file" id="spPhotoInput" accept="image/*" style="display:none" onchange="uploadStorePhoto(event)">
+        <div style="font-size:.71rem;color:var(--muted);margin-top:6px">Klik untuk ganti foto</div>
+      </div>
+      <label class="mlabel">Nama Toko *</label>
+      <input class="minput" id="spName" type="text">
+      <label class="mlabel">Nomor WhatsApp</label>
+      <div style="position:relative">
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:.84rem;color:var(--muted)">+62</span>
+        <input class="minput" id="spWa" type="tel" style="padding-left:44px" placeholder="812-3456-7890">
+      </div>
+      <label class="mlabel">Deskripsi Toko</label>
+      <textarea class="minput mtextarea" id="spDesc" placeholder="Toko terpercaya..."></textarea>
+    </div>
+    <div class="mfooter">
+      <button class="mbtn mbtn-cancel" onclick="closeModal('spModal')">Batal</button>
+      <button class="mbtn mbtn-seller" onclick="saveStore()">Simpan ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- STORE VIEW MODAL (buyer) -->
+<div class="overlay" id="storeViewModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="store-view-hero" id="svHero">
+      <img id="svHeroBg" src="" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.4">
+      <div class="store-view-av" id="svAv">🏪</div>
+      <button class="modal-close wh" onclick="closeModal('storeViewModal')" style="position:absolute;top:10px;right:12px">✕</button>
+    </div>
+    <div class="store-view-info">
+      <div class="store-view-name" id="svName">Nama Toko</div>
+      <div class="store-view-desc" id="svDesc"></div>
+      <div id="svWaWrap">
+        <div class="no-wa" id="svNoWa" style="display:none">⚠️ Seller belum mengatur nomor WhatsApp</div>
+        <button class="wa-btn" id="svWaBtn" onclick="callWa()">📱 Hubungi via WhatsApp</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BUYER ADDRESS MODAL -->
+<div class="overlay" id="addrModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-hd">
+      <h3>📍 Alamat Buyer</h3>
+      <button class="modal-close" onclick="closeModal('addrModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <label class="mlabel">Alamat Lengkap *</label>
+      <textarea class="minput mtextarea" id="buyerAddrInput" placeholder="Contoh: Jl. Melati No. 10, RT 03/RW 05, Jakarta Selatan"></textarea>
+      <div style="font-size:.73rem;color:var(--muted);margin-top:8px;line-height:1.45">Alamat ini akan dipakai sebagai alamat pengiriman default saat buyer membuat pesanan.</div>
+    </div>
+    <div class="mfooter">
+      <button class="mbtn mbtn-cancel" onclick="closeModal('addrModal')">Batal</button>
+      <button class="mbtn mbtn-buyer" onclick="saveBuyerAddress()">Simpan Alamat ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- ORDER HISTORY -->
+<div class="overlay" id="ohModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-hd">
+      <h3 id="ohTitle">📋 Riwayat Pesanan</h3>
+      <button class="modal-close" onclick="closeModal('ohModal')">✕</button>
+    </div>
+    <div class="oh-tabs" id="ohTabs">
+      <button class="oh-tab on" onclick="switchOHTab('all',this)">Semua</button>
+      <button class="oh-tab" onclick="switchOHTab('pending',this)">Pending</button>
+      <button class="oh-tab" onclick="switchOHTab('confirmed',this)">Dikonfirmasi</button>
+      <button class="oh-tab" onclick="switchOHTab('shipped',this)">Dikirim</button>
+      <button class="oh-tab" onclick="switchOHTab('done',this)">Selesai</button>
+    </div>
+    <div class="modal-body" id="ohBody"></div>
+  </div>
+</div>
+
+<!-- BUY QUANTITY MODAL -->
+<div class="overlay" id="qtyModal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-hd">
+      <h3 id="qtyTitle">🛒 Beli Produk</h3>
+      <button class="modal-close" onclick="closeQtyModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div id="qtyProductIcon" style="width:46px;height:46px;border-radius:14px;background:#fff7e6;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0">📦</div>
+        <div style="min-width:0">
+          <div id="qtyProductName" style="font-size:.95rem;font-weight:700;color:var(--text)">Produk</div>
+          <div id="qtyProductPrice" style="font-size:.78rem;color:var(--muted)">Harga satuan</div>
+        </div>
+      </div>
+      <label class="mlabel" for="qtyInput">Jumlah</label>
+      <input class="minput" id="qtyInput" type="number" min="1" step="1" value="1" oninput="updateQtyPreview()" placeholder="Masukkan jumlah">
+      <div class="qty-preview">
+        <div class="qty-preview-label">Harga Total</div>
+        <div class="qty-preview-total" id="qtyTotalPreview">Rp 0</div>
+        <div class="qty-preview-note" id="qtyTotalNote">1 x harga item</div>
+      </div>
+    </div>
+    <div class="mfooter">
+      <button class="mbtn mbtn-cancel" onclick="closeQtyModal()">Batal</button>
+      <button class="mbtn mbtn-seller" onclick="confirmQtyOrder()">Beli Sekarang</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, updateDoc, getDocs, where, limit, deleteDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCG12sZPeovF7V0NtBJRNJfEKThT087v40",
+  authDomain: "marketchat-5cdd1.firebaseapp.com",
+  projectId: "marketchat-5cdd1",
+  storageBucket: "marketchat-5cdd1.firebasestorage.app",
+  messagingSenderId: "507087063419",
+  appId: "1:507087063419:web:6d16bb9d185977ad1f15de"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// ===== STATE =====
+let currentUser = null;
+let userRole = 'buyer';
+let storeData = { name:'', wa:'', desc:'', photo:null };
+let buyerAddress = '';
+let offerPhotoData = null;
+let storePhotoData = null;
+let showingProd = false;
+let pendingBuyItem = null;
+let ohTab = 'all';
+let unsubMessages = null;
+let unsubOrders = null;
+let unsubOrderEvents = null;
+let mid = 100;
+let toastTimer;
+
+const EM = ['😊','👍','❤️','🙏','✅','🔥','💯','😂','🎉','👋'];
+const QR = {
+  buyer: ['Cek Produk 🛍️','Harga Terbaik 💰','Cara Kirim 🚚','Ada Diskon? 🏷️'],
+  seller: ['Kirim Produk 📦','Konfirmasi Order ✅','Info Ongkir 🚚','Promo Hari Ini 🎉'],
+};
+const prods = [
+  {id:'P1',name:'Earphone Pro X',emoji:'🎧',price:'Rp 285.000',stock:'15 tersisa'},
+  {id:'P2',name:'Powerbank 20k', emoji:'🔋',price:'Rp 195.000',stock:'8 tersisa'},
+  {id:'P3',name:'Smart Watch',   emoji:'⌚',price:'Rp 450.000',stock:'5 tersisa'},
+  {id:'P4',name:'Mini Fan USB',  emoji:'🌀',price:'Rp 75.000', stock:'Stok banyak'},
+];
+const statusLabel = {
+  pending:   {label:'⏳ Menunggu',     cls:'s-pending'},
+  confirmed: {label:'✅ Dikonfirmasi', cls:'s-confirmed'},
+  shipped:   {label:'🚚 Dikirim',      cls:'s-shipped'},
+  done:      {label:'🎉 Selesai',      cls:'s-done'},
+  cancelled: {label:'❌ Dibatalkan',   cls:'s-cancelled'},
+};
+let orders = [];
+let sellerProducts = [...prods];
+let unsubSellerProducts = null;
+let productPhotoData = null;
+let editingProductId = null;
+
+initCookieFeatures();
+
+function setCookie(name, value, days){
+  const maxAge = days * 24 * 60 * 60;
+  document.cookie = `${name}=${encodeURIComponent(value)}; max-age=${maxAge}; path=/; SameSite=Lax`;
+}
+
+function getCookie(name){
+  const p = `${name}=`;
+  const parts = document.cookie ? document.cookie.split('; ') : [];
+  for(const c of parts){
+    if(c.indexOf(p) === 0) return decodeURIComponent(c.substring(p.length));
+  }
+  return '';
+}
+
+function deleteCookie(name){
+  document.cookie = `${name}=; max-age=0; path=/; SameSite=Lax`;
+}
+
+function getConsentValue(){
+  return getCookie('mc_cookie_consent') || localStorage.getItem('mc_cookie_consent') || '';
+}
+
+function setConsentValue(value, days){
+  setCookie('mc_cookie_consent', value, days);
+  localStorage.setItem('mc_cookie_consent', value);
+}
+
+function clearConsentValue(){
+  deleteCookie('mc_cookie_consent');
+  localStorage.removeItem('mc_cookie_consent');
+}
+
+function hasAcceptedCookies(){
+  return getConsentValue() === 'accepted';
+}
+
+function initCookieFeatures(){
+  const consent = getConsentValue();
+  const bar = document.getElementById('cookieBar');
+  if(!consent){
+    bar.style.display = 'block';
+  } else {
+    bar.style.display = 'none';
+  }
+
+  if(consent === 'accepted'){
+    const lastRole = getCookie('mc_last_role');
+    if(lastRole === 'buyer' || lastRole === 'seller'){
+      userRole = lastRole;
+      document.getElementById('rcBuyer').className = 'role-card'+(lastRole==='buyer'?' on-buyer':'');
+      document.getElementById('rcSeller').className = 'role-card'+(lastRole==='seller'?' on-seller':'');
+      updateAuthBtn();
+    }
+  }
+}
+
+function saveLastRole(role){
+  if(hasAcceptedCookies()) setCookie('mc_last_role', role, 180);
+}
+
+window.acceptCookies = () => {
+  setConsentValue('accepted', 365);
+  saveLastRole(userRole);
+  document.getElementById('cookieBar').style.display = 'none';
+  showToast('✅ Cookie diterima. Preferensi role akan disimpan.');
+};
+
+window.rejectCookies = () => {
+  setConsentValue('rejected', 365);
+  deleteCookie('mc_last_role');
+  document.getElementById('cookieBar').style.display = 'none';
+  showToast('ℹ️ Cookie non-esensial ditolak.');
+};
+
+// ===== AUTH STATE =====
+onAuthStateChanged(auth, async user => {
+  document.getElementById('loadingScreen').style.display = 'none';
+  if(user){
+    currentUser = user;
+    // load user profile
+    const uDoc = await getDoc(doc(db,'users',user.uid));
+    if(uDoc.exists()){
+      const d = uDoc.data();
+      userRole = d.role || 'buyer';
+      if(d.role === 'seller'){
+        storeData = { name: d.storeName||'', wa: d.wa||'', desc: d.desc||'', photo: d.photo||null };
+      } else {
+        buyerAddress = d.address || '';
+      }
+    } else {
+      // anonymous/guest
+      userRole = 'buyer';
+      buyerAddress = '';
+    }
+    showApp();
+  } else {
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('appScreen').style.display = 'none';
+  }
+});
+
+// ===== AUTH FUNCTIONS =====
+window.switchAuthTab = (tab) => {
+  document.getElementById('tabLogin').className = 'auth-tab'+(tab==='login'?' on':'');
+  document.getElementById('tabReg').className   = 'auth-tab'+(tab==='register'?' on':'');
+  document.getElementById('storeNameWrap').style.display = (tab==='register' && userRole==='seller') ? 'block':'none';
+  updateAuthBtn();
+};
+
+window.pickRole = (role) => {
+  userRole = role;
+  saveLastRole(role);
+  document.getElementById('rcBuyer').className = 'role-card'+(role==='buyer'?' on-buyer':'');
+  document.getElementById('rcSeller').className = 'role-card'+(role==='seller'?' on-seller':'');
+  const isReg = document.getElementById('tabReg').classList.contains('on');
+  document.getElementById('storeNameWrap').style.display = (isReg && role==='seller') ? 'block':'none';
+  updateAuthBtn();
+};
+
+function updateAuthBtn(){
+  const isLogin = document.getElementById('tabLogin').classList.contains('on');
+  const btn = document.getElementById('authBtn');
+  btn.className = 'auth-btn auth-btn-' + userRole;
+  const label = userRole==='buyer' ? 'Buyer 🛒' : 'Seller 🏪';
+  btn.textContent = (isLogin?'Masuk':'Daftar') + ' sebagai ' + label;
+}
+
+window.doAuth = async () => {
+  const email = document.getElementById('emailInput').value.trim();
+  const pass  = document.getElementById('passInput').value;
+  const errEl = document.getElementById('authErr');
+  const isLogin = document.getElementById('tabLogin').classList.contains('on');
+  errEl.style.display = 'none';
+  if(!email||!pass){ showErr('Email dan password wajib diisi!'); return; }
+  try {
+    let cred;
+    if(isLogin){
+      cred = await signInWithEmailAndPassword(auth, email, pass);
+    } else {
+      cred = await createUserWithEmailAndPassword(auth, email, pass);
+      // save user profile
+      const storeName = document.getElementById('storeNameInput').value.trim();
+      await setDoc(doc(db,'users',cred.user.uid), {
+        role: userRole,
+        email,
+        storeName: userRole==='seller' ? (storeName||'Toko Baru') : '',
+        wa:'', desc:'', photo:null,
+        createdAt: serverTimestamp()
+      });
+      if(userRole==='seller'){
+        storeData.name = storeName || 'Toko Baru';
+      }
+    }
+  } catch(e){
+    const msgs2 = {
+      'auth/user-not-found':'Email tidak terdaftar.',
+      'auth/wrong-password':'Password salah.',
+      'auth/email-already-in-use':'Email sudah digunakan.',
+      'auth/invalid-email':'Format email tidak valid.',
+      'auth/weak-password':'Password minimal 6 karakter.',
+      'auth/invalid-credential':'Email atau password salah.',
+    };
+    showErr(msgs2[e.code] || e.message);
+  }
+};
+
+window.guestLogin = async () => {
+  userRole = 'buyer';
+  await signInAnonymously(auth);
+};
+
+window.doLogout = async () => {
+  if(unsubMessages) unsubMessages();
+  if(unsubOrders) unsubOrders();
+  if(unsubOrderEvents) unsubOrderEvents();
+  if(unsubSellerProducts) unsubSellerProducts();
+  await signOut(auth);
+  document.getElementById('appScreen').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'flex';
+};
+
+function showErr(msg){
+  const el = document.getElementById('authErr');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+// ===== SHOW APP =====
+async function showApp(){
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display = 'flex';
+  if(userRole === 'buyer'){
+    await loadSellerStoreForBuyer();
+  } else {
+    listenSellerProducts();
+  }
+  applyRole();
+  listenMessages();
+  listenOrders();
+}
+
+async function loadSellerStoreForBuyer(){
+  try {
+    const sq = query(collection(db,'users'), where('role','==','seller'), limit(1));
+    const snap = await getDocs(sq);
+    if(!snap.empty){
+      const s = snap.docs[0].data();
+      storeData = {
+        name: s.storeName || '',
+        wa: s.wa || '',
+        desc: s.desc || '',
+        photo: s.photo || null,
+      };
+    }
+  } catch(e) {
+    // Keep existing storeData if fetch fails.
+  }
+}
+
+function applyRole(){
+  const isSeller = userRole === 'seller';
+  document.getElementById('appScreen').className = 'app-screen' + (isSeller ? ' seller-view' : '');
+  document.getElementById('hdr').className = 'header ' + (isSeller?'hs':'hb');
+  document.getElementById('roleStrip').className = 'role-strip ' + (isSeller?'hs':'hb');
+  document.getElementById('hname').textContent = isSeller ? (storeData.name||'Toko Saya') : 'MarketChat';
+  document.getElementById('hstxt').textContent = isSeller ? '🏪 Seller' : '🛒 Buyer';
+  document.getElementById('rsInfo').textContent = isSeller
+    ? '🏪 ' + (storeData.name||'Toko Saya')
+    : (currentUser?.isAnonymous ? '👤 Tamu' : '🛒 ' + (currentUser?.email||'Buyer'));
+
+  // header logo
+  updateHeaderLogo();
+
+  // buttons
+  document.getElementById('histBtn').style.display  = 'flex';
+  document.getElementById('addrBtn').style.display  = isSeller ? 'none' : 'flex';
+  document.getElementById('phoneBtn').style.display = isSeller ? 'none' : 'flex';
+  document.getElementById('storeBtn').style.display = isSeller ? 'flex' : 'none';
+  document.getElementById('offerBtn').style.display = isSeller ? 'flex' : 'none';
+  document.getElementById('pkgBtn').style.display   = isSeller ? 'flex' : 'none';
+  document.getElementById('photoBtn').style.display = isSeller ? 'flex' : 'none';
+  document.getElementById('aiRecoBar').style.display = isSeller ? 'flex' : 'none';
+
+  // input pill
+  document.getElementById('pill').className = 'ipill' + (isSeller?' sp':'');
+  document.getElementById('micB').className = 'pb mic' + (isSeller?' s':'');
+  document.getElementById('sndB').className = 'pb snd' + (isSeller?' s':'');
+
+  // quick replies
+  renderQR();
+}
+
+function updateHeaderLogo(){
+  const logo = document.getElementById('hlogo');
+  if(userRole==='seller' && storeData.photo){
+    logo.innerHTML = `<img src="${storeData.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:11px">`;
+  } else {
+    logo.innerHTML = userRole==='seller' ? '🏪' : '🛍️';
+  }
+}
+
+// ===== MESSAGES (Firestore) =====
+function listenMessages(){
+  if(unsubMessages) unsubMessages();
+  const q = query(collection(db,'messages'), orderBy('createdAt','asc'));
+  unsubMessages = onSnapshot(q, snap => {
+    const msgs = [];
+    snap.forEach(d => msgs.push({id:d.id, ...d.data()}));
+    renderMessages(msgs);
+    updateSellerRecommendations(msgs);
+  });
+}
+
+function updateSellerRecommendations(msgs){
+  const bar = document.getElementById('aiRecoBar');
+  if(!bar) return;
+  if(userRole !== 'seller'){
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+    return;
+  }
+
+  const buyerTexts = msgs.filter(m => m.senderRole === 'buyer' && m.type === 'text');
+  const freq = {};
+  buyerTexts.forEach(m => {
+    (m.keywords || []).forEach(k => {
+      const key = String(k || '').toLowerCase().trim();
+      if(!key) return;
+      freq[key] = (freq[key] || 0) + 1;
+    });
+  });
+
+  const topKeywords = Object.entries(freq)
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,4)
+    .map(x=>x[0]);
+
+  const hasPriceIntent = topKeywords.some(k => /(murah|diskon|promo|hemat|cheap|deal|bargain|budget)/i.test(k));
+  const hasSpeedIntent = topKeywords.some(k => /(cepat|kilat|express|same.?day|fast|quick|urgent)/i.test(k));
+  const hasQualityIntent = topKeywords.some(k => /(bagus|berkualitas|original|asli|ori|quality|genuine|authentic)/i.test(k));
+  const hasVariantIntent = topKeywords.some(k => /(warna|size|ukuran|besar|kecil|red|blue|black|white)/i.test(k));
+  const hasFoodIntent = topKeywords.some(k => /(nasi|rice|food|makan|menu)/i.test(k));
+  const hasAudioIntent = topKeywords.some(k => /(bass|audio|sound|speaker|headphone|earphone)/i.test(k));
+  const sweetIntent = topKeywords.some(k => /(manis|sweet)/i.test(k));
+
+  const suggestions = [];
+  if(hasPriceIntent) suggestions.push('Beri opsi promo atau bundling agar buyer merasa dapat value terbaik.');
+  if(hasSpeedIntent) suggestions.push('Tegaskan estimasi pengiriman dan opsi kirim cepat.');
+  if(hasQualityIntent) suggestions.push('Tonjolkan kualitas, garansi, dan keaslian produk.');
+  if(hasVariantIntent) suggestions.push('Tawarkan varian warna/ukuran yang tersedia.');
+  if(hasFoodIntent) suggestions.push('Tawarkan menu nasi yang relevan seperti nasi padang atau nasi kuning.');
+  if(hasAudioIntent) suggestions.push('Rekomendasikan headset yang cocok untuk kebutuhan bass buyer.');
+  if(sweetIntent) suggestions.push('Arahkan ke produk manis seperti cupcake atau dessert serupa.');
+  if(!suggestions.length && topKeywords.length){
+    suggestions.push('Buyer menunjukkan minat spesifik. Tawarkan produk yang paling relevan dengan kebutuhannya.');
+  }
+
+  const replyTemplates = [];
+  if(topKeywords[0]) replyTemplates.push(`Untuk kebutuhan ${topKeywords[0]}, saya rekomendasikan produk terbaik kami.`);
+  if(hasPriceIntent) replyTemplates.push('Kami bisa kasih harga promo hari ini, mau saya kirimkan penawaran spesial?');
+  if(hasSpeedIntent) replyTemplates.push('Bisa kirim cepat, estimasi sampai 1-2 hari. Mau lanjut checkout?');
+  if(hasQualityIntent) replyTemplates.push('Produk ini original dan bergaransi. Jika mau, saya kirim detail spesifikasinya.');
+  if(hasFoodIntent) replyTemplates.push('Ada opsi nasi padang dan nasi kuning yang lagi ready, mau saya kirim menu lengkapnya?');
+  if(hasAudioIntent) replyTemplates.push('Kalau cari bass, saya rekomendasikan headset yang suaranya lebih nendang.');
+  if(sweetIntent) replyTemplates.push('Kalau suka manis, saya punya rekomendasi cupcake yang cocok.');
+  if(!replyTemplates.length) replyTemplates.push('Terima kasih kak, saya bantu rekomendasikan produk yang paling cocok ya.');
+
+  const keywordInfo = topKeywords.length
+    ? `<div class="ai-muted">Minat buyer: ${topKeywords.join(', ')}</div>`
+    : `<div class="ai-muted">Belum cukup data keyword buyer.</div>`;
+
+  bar.innerHTML = `
+    <div class="ai-reco-title">AI INSIGHT UNTUK SELLER</div>
+    ${keywordInfo}
+    ${suggestions.slice(0,2).map(s=>`<button class="ai-chip" onclick="useAIReply('${encodeURIComponent(s)}')">💡 ${s}</button>`).join('')}
+    ${replyTemplates.slice(0,2).map(s=>`<button class="ai-chip" onclick="useAIReply('${encodeURIComponent(s)}')">✍️ ${s}</button>`).join('')}
+  `;
+  bar.style.display = 'flex';
+}
+
+window.useAIReply = (encodedText) => {
+  const text = decodeURIComponent(encodedText || '');
+  const i = document.getElementById('msgi');
+  i.value = text;
+  i.focus();
+  ares(i);
+};
+
+function getQuickCueSuggestions(message){
+  if(userRole !== 'seller') return [];
+
+  const text = String(message?.text || '').toLowerCase();
+  const keywords = Array.isArray(message?.keywords) ? message.keywords.map(k => String(k).toLowerCase()) : [];
+  const hits = new Set([...keywords, text]);
+  const cues = [];
+
+  if([...hits].some(v => v.includes('manis') || v.includes('sweet'))){
+    cues.push('cupcake?');
+  }
+
+  return cues;
+}
+
+function listenOrders(){
+  if(unsubOrders) unsubOrders();
+  const oq = query(collection(db,'orders'), orderBy('createdAt','desc'));
+  unsubOrders = onSnapshot(oq, snap => {
+    const all = [];
+    snap.forEach(d => all.push({docId:d.id, ...d.data()}));
+    orders = userRole === 'buyer'
+      ? all.filter(o => o.buyerUid === currentUser.uid)
+      : all;
+    if(document.getElementById('ohModal').style.display === 'flex'){
+      renderOrders();
+    }
+  }, () => {
+    // Fallback if orders collection is blocked by rules.
+    listenOrdersFromMessages();
+  });
+}
+
+function listenOrdersFromMessages(){
+  if(unsubOrderEvents) unsubOrderEvents();
+  const mq = query(collection(db,'messages'), where('type','==','order-event'));
+  unsubOrderEvents = onSnapshot(mq, snap => {
+    const all = [];
+    snap.forEach(d => {
+      const m = d.data();
+      if(m.order){
+        all.push({ docId: d.id, ...m.order });
+      }
+    });
+    all.sort((a,b)=>(b.createdAtMs||0)-(a.createdAtMs||0));
+    orders = userRole === 'buyer'
+      ? all.filter(o => o.buyerUid === currentUser.uid)
+      : all;
+    if(document.getElementById('ohModal').style.display === 'flex'){
+      renderOrders();
+    }
+  });
+}
+
+function renderMessages(msgs){
+  const w = document.getElementById('mw');
+  let h = '<div class="dsep">Hari ini</div>';
+  msgs.forEach(m => {
+    const isMe = m.senderUid === currentUser?.uid;
+    const isBuyerMsg = m.senderRole === 'buyer';
+    const senderName = m.senderName || (m.senderRole === 'seller' ? (storeData.name || 'Seller') : 'Buyer');
+    const avCls = isBuyerMsg ? 'avb' : 'avs';
+    const avContent = m.senderPhoto
+      ? `<img src="${m.senderPhoto}">`
+      : (isBuyerMsg ? '🛒' : '🏪');
+    const av = `<div class="mav ${avCls}">${avContent}</div>`;
+    const senderLine = !isMe ? `<div style="font-size:.66rem;font-weight:700;color:var(--muted);margin:0 2px 4px">${senderName}</div>` : '';
+    const delBtn = (isMe && m.type !== 'order-event') ? `<button onclick="deleteMessage('${m.id}')" title="Hapus pesan" style="position:absolute;top:-4px;right:-6px;width:24px;height:24px;border:none;border-radius:50%;background:rgba(255,255,255,.95);color:var(--red);box-shadow:0 2px 10px rgba(0,0,0,.12);cursor:pointer;font-size:.8rem;line-height:1">🗑️</button>` : '';
+    const quickCues = (!isMe && isBuyerMsg && m.type === 'text') ? getQuickCueSuggestions(m) : [];
+    const miniSuggest = quickCues.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px">${quickCues.map(c => `<div class="mini-suggest" onclick="useAIReply('${encodeURIComponent(c)}')">💡 ${c}</div>`).join('')}</div>` : '';
+    const t = m.createdAt?.toDate ? fmtTime(m.createdAt.toDate()) : m.time||'';
+
+    if(m.type==='img'){
+      h+=`<div class="mrow${isMe?' me':''}">
+        ${!isMe?av:''}
+        <div style="position:relative">
+          ${delBtn}
+          ${senderLine}
+          <div class="imgbbl" onclick="openLightbox('${m.imgSrc}')"><img src="${m.imgSrc}"></div>
+          <span style="font-size:.63rem;color:var(--muted);display:block;padding:2px 3px;text-align:${isMe?'right':'left'}">${t}</span>
+        </div>
+        ${isMe?av:''}</div>`;
+    } else if(m.type==='offer'){
+      const o = m.offer;
+      const disc = o.original ? Math.round((1-parseInt(o.price.replace(/\D/g,''))/parseInt(o.original.replace(/\D/g,'')))*100) : 0;
+      h+=`<div class="mrow${isMe?' me':''}">
+        ${!isMe?av:''}
+        <div style="position:relative">
+          ${delBtn}
+          ${senderLine}
+          <div class="obbl${isMe?' mine':''}">
+            <div class="obbl-hd"><span>✨ PENAWARAN SPESIAL</span>${disc>0?`<span class="obbl-badge">-${disc}%</span>`:''}</div>
+            <div class="obbl-body">
+              ${o.photo?`<img src="${o.photo}" style="width:100%;max-height:150px;object-fit:cover;border-radius:9px;margin-bottom:9px;cursor:pointer" onclick="openLightbox('${o.photo}')">`: ''}
+              <div class="obbl-name">${o.name}</div>
+              ${o.desc?`<div class="obbl-desc">${o.desc}</div>`:''}
+              <div class="obbl-prices">
+                ${o.original?`<span class="obbl-ori">Rp ${o.original}</span>`:''}
+                <span class="obbl-price">Rp ${o.price}</span>
+                ${disc>0?`<span class="obbl-disc">Hemat ${disc}%</span>`:''}
+              </div>
+              ${!isMe && !o.accepted && !o.declined?`
+              <div class="obbl-acts">
+                <button class="obbl-accept" onclick="acceptOffer('${m.id}')">✓ Terima</button>
+                <button class="obbl-decline" onclick="declineOffer('${m.id}')">✕ Tolak</button>
+              </div>`:
+              o.accepted?`<div class="obbl-acts"><button class="obbl-accept ok" disabled>✓ Diterima!</button></div>`:
+              o.declined?`<div style="font-size:.76rem;color:var(--muted);text-align:center;padding:4px 0">Penawaran ditolak</div>`:''
+              }
+            </div>
+          </div>
+          <span class="obbl-time">${t}</span>
+        </div>
+        ${isMe?av:''}</div>`;
+    } else if(m.type==='product'){
+      h+=`<div class="mrow${isMe?' me':''}">
+        ${!isMe?av:''}
+        <div style="position:relative">
+          ${delBtn}
+          ${senderLine}
+          <div class="pbbl${isMe?' mine':''}">
+            <div class="pbbl-img">${m.prod.photo ? `<img src="${m.prod.photo}" style="width:100%;height:100%;object-fit:cover">` : (m.prod.emoji || '📦')}</div>
+            <div class="pbbl-info"><div class="pbbl-nm">${m.prod.name}</div><div class="pbbl-pr">${m.prod.price}</div></div>
+            ${!isMe?`<button class="pbbl-btn" onclick="buyProd('${m.prod.name}','${m.prod.emoji}','${m.prod.price}','', '${m.prod.photo || ''}')">🛒 Beli Sekarang</button>`:''}
+          </div>
+          <span style="font-size:.63rem;color:var(--muted);display:block;padding:2px 3px;text-align:${isMe?'right':'left'}">${t}</span>
+        </div>
+        ${isMe?av:''}</div>`;
+    } else {
+      const bCls = isMe ? (isBuyerMsg?'meb':'mes') : 'them';
+      // highlight keywords if buyer message
+      let txt = (m.text||'').replace(/\n/g,'<br>');
+      if(m.keywords && m.keywords.length > 0) {
+        m.keywords.forEach(kw => {
+          const safe = kw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+          const re = new RegExp(`(${safe})`, 'gi');
+          txt = txt.replace(re, `<span class="kw">$1</span>`);
+        });
+      }
+      h+=`<div class="mrow${isMe?' me':''}">
+        ${!isMe?av:''}
+        <div style="position:relative">
+          ${delBtn}
+          ${senderLine}
+          <div class="bbl ${bCls}">${txt}<span class="bt">${t}</span></div>
+          ${miniSuggest}
+        </div>
+        ${isMe?av:''}</div>`;
+    }
+  });
+  w.innerHTML = h;
+  w.scrollTop = w.scrollHeight;
+}
+
+// ===== SEND =====
+async function sendMsg(data){
+  await addDoc(collection(db,'messages'), {
+    ...data,
+    senderUid: currentUser.uid,
+    senderRole: userRole,
+    senderEmail: currentUser.email || '',
+    senderName: userRole === 'seller' ? (storeData.name || 'Seller') : (currentUser.email || 'Buyer'),
+    senderPhoto: (userRole==='seller' && storeData.photo) ? storeData.photo : null,
+    createdAt: serverTimestamp(),
+    time: fmtTime(new Date()),
+  });
+}
+
+window.deleteMessage = async (msgId) => {
+  if(!confirm('Hapus pesan ini?')) return;
+  await deleteDoc(doc(db,'messages',msgId));
+  showToast('🗑️ Pesan dihapus.');
+};
+
+window.send = async () => {
+  const inp = document.getElementById('msgi');
+  const text = inp.value.trim(); if(!text) return;
+  inp.value=''; inp.style.height='auto';
+
+  // AI keyword detection for buyer messages
+  let keywords = [];
+  if(userRole === 'buyer') {
+    keywords = await detectKeywords(text);
+  }
+  await sendMsg({type:'text', text, keywords});
+};
+
+async function detectKeywords(text) {
+  try {
+    const patterns = [
+      // Sifat/tekstur/rasa (ID + EN)
+      /\b(manis|asin|pedas|asam|guruh|lembut|keras|kasar|halus|kenyal|renyah|garing|sweet|salty|spicy|sour|soft|hard|rough|smooth|chewy|crispy|crunchy|tender|fluffy|creamy|silky)\b/gi,
+      // Ukuran (ID + EN)
+      /\b(besar|kecil|sedang|panjang|pendek|tipis|tebal|lebar|mini|jumbo|big|large|small|tiny|medium|long|short|thin|thick|wide|narrow|slim|compact|portable)\b/gi,
+      // Harga (ID + EN)
+      /\b(murah|terjangkau|hemat|ekonomis|mahal|premium|mewah|budget|diskon|promo|gratis|cheap|affordable|inexpensive|expensive|luxury|discount|free|sale|deal|bargain|value)\b/gi,
+      // Kualitas (ID + EN)
+      /\b(bagus|baik|berkualitas|original|asli|ori|terbaik|good|great|quality|original|genuine|authentic|best|top|excellent|nice|perfect|fine|high.?end|low.?quality)\b/gi,
+      // Warna (ID + EN)
+      /\b(merah|biru|hijau|kuning|hitam|putih|abu|coklat|pink|ungu|orange|emas|silver|gold|cream|navy|red|blue|green|yellow|black|white|gray|grey|brown|purple|golden|beige|maroon|teal|cyan|magenta)\b/gi,
+      // Waktu/pengiriman (ID + EN)
+      /\b(cepat|kilat|express|segera|urgent|instant|fast|quick|speedy|rapid|same.?day|next.?day|overnight|asap|immediate|slow|delayed)\b/gi,
+      // Bahan/material (ID + EN)
+      /\b(katun|polyester|kulit|plastik|kayu|besi|karet|kain|cotton|leather|plastic|wood|metal|rubber|fabric|silk|wool|linen|velvet|denim|canvas|nylon|bamboo|ceramic|glass|stainless)\b/gi,
+      // Kondisi (ID + EN)
+      /\b(tahan.?lama|awet|kuat|ringan|berat|waterproof|anti.?air|garansi|durable|strong|lightweight|heavy|water.?proof|water.?resistant|guaranteed|warranty|long.?lasting|sturdy|fragile)\b/gi,
+      // Gaya/style (EN)
+      /\b(casual|formal|elegant|modern|classic|vintage|minimalist|sporty|trendy|stylish|chic|cute|aesthetic|simple|plain|fancy|unique|cool|pretty|beautiful)\b/gi,
+      // Kata setelah trigger words (ID + EN)
+      /(?:yang|mau|cari|ingin|pengen|butuh|perlu|suka|want|need|looking.?for|prefer|like|wish|find|get)\s+(\w+)/gi,
+    ];
+
+    const found = new Set();
+    patterns.slice(0,-1).forEach(re => {
+      const matches = text.match(re);
+      if(matches) matches.forEach(m => found.add(m.toLowerCase()));
+    });
+
+    // Handle trigger word patterns separately
+    const triggerRe = /(?:yang|mau|cari|ingin|pengen|butuh|perlu|suka|want|need|looking for|prefer|like|wish)\s+(\w+)/gi;
+    let match;
+    while((match = triggerRe.exec(text)) !== null) {
+      const word = match[1].toLowerCase();
+      if(word.length > 2 && !['the','and','or','for','but','a','an','to','of','in','on','at','is','it','i'].includes(word))
+        found.add(word);
+    }
+
+    return [...found];
+  } catch(e) {
+    return [];
+  }
+}
+
+window.sendPhoto = (event) => {
+  const file = event.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async e => {
+    await sendMsg({type:'img', imgSrc: e.target.result});
+    showToast('📷 Foto dikirim!');
+  };
+  reader.readAsDataURL(file);
+  event.target.value='';
+};
+
+window.sndP = async (pid) => {
+  const p = sellerProducts.find(x=>x.id===pid);
+  if(!p) return;
+  await sendMsg({type:'product', prod:p});
+  showToast(`📤 ${p.name} dikirim!`);
+  if(showingProd) toggleProdPanel();
+};
+
+window.saveNewProduct = async () => {
+  if(userRole !== 'seller') return;
+  const name = document.getElementById('npName').value.trim();
+  const price = document.getElementById('npPrice').value.trim();
+  const stock = document.getElementById('npStock').value.trim() || 'Stok tersedia';
+  if(!name || !price){
+    showToast('⚠️ Nama dan harga wajib diisi!');
+    return;
+  }
+
+  const payload = {
+    name,
+    emoji: '📦',
+    photo: productPhotoData || null,
+    price,
+    stock,
+    createdAt: serverTimestamp(),
+    createdAtMs: Date.now(),
+  };
+
+  if(editingProductId){
+    await updateDoc(doc(db,'users',currentUser.uid,'products',editingProductId), payload);
+    showToast('✅ Barang diperbarui.');
+  } else {
+    await addDoc(collection(db,'users',currentUser.uid,'products'), payload);
+    showToast('✅ Barang baru ditambahkan.');
+  }
+
+  document.getElementById('npName').value = '';
+  document.getElementById('npPrice').value = '';
+  document.getElementById('npStock').value = '';
+  productPhotoData = null;
+  document.getElementById('npPrev').src = '';
+  document.getElementById('npPrev').style.display = 'none';
+  document.getElementById('npPuIcon').style.display = 'block';
+  document.getElementById('npPuLbl').textContent = 'Klik untuk upload foto barang';
+  editingProductId = null;
+  closeModal('addProdModal');
+};
+
+window.deleteCurrentProduct = async () => {
+  if(!editingProductId || userRole !== 'seller') return;
+  if(!confirm('Hapus barang ini?')) return;
+  await deleteDoc(doc(db,'users',currentUser.uid,'products',editingProductId));
+  editingProductId = null;
+  closeModal('addProdModal');
+  showToast('🗑️ Barang dihapus.');
+};
+
+window.deleteProductById = async (productId) => {
+  if(userRole !== 'seller') return;
+  if(!confirm('Hapus barang ini?')) return;
+  await deleteDoc(doc(db,'users',currentUser.uid,'products',productId));
+  showToast('🗑️ Barang dihapus.');
+};
+
+window.sendOffer = async () => {
+  const name  = document.getElementById('ofNm').value.trim();
+  const price = document.getElementById('ofPrice').value.trim();
+  if(!name||!price){ showToast('⚠️ Nama & harga wajib diisi!'); return; }
+  const desc     = document.getElementById('ofDesc').value.trim();
+  const original = document.getElementById('ofOri').value.trim();
+  await sendMsg({type:'offer', offer:{name,desc,price,original,photo:offerPhotoData,accepted:false,declined:false}});
+  ['ofNm','ofDesc','ofOri','ofPrice'].forEach(id=>document.getElementById(id).value='');
+  offerPhotoData=null;
+  document.getElementById('ofPrev').style.display='none';
+  document.getElementById('ofPuIcon').style.display='block';
+  document.getElementById('ofPuLbl').textContent='Upload foto produk (opsional)';
+  closeModal('offerModal');
+  showToast('🏷️ Penawaran dikirim!');
+};
+
+window.acceptOffer = async (msgId) => {
+  const msgRef = doc(db,'messages',msgId);
+  const snap = await getDoc(msgRef);
+  if(!snap.exists()){
+    showToast('⚠️ Data penawaran tidak ditemukan.');
+    return;
+  }
+
+  const msg = snap.data();
+  const offer = msg.offer || {};
+  const buyerUid = msg.senderUid || '';
+  const buyerEmail = msg.senderEmail || '';
+  let buyerAddressValue = '';
+
+  if(buyerUid){
+    const buyerDoc = await getDoc(doc(db,'users',buyerUid));
+    if(buyerDoc.exists()){
+      buyerAddressValue = buyerDoc.data().address || '';
+    }
+  }
+
+  const now = new Date();
+  const orderPayload = {
+    orderNo: 'O' + Date.now().toString().slice(-8),
+    name: offer.name || 'Penawaran',
+    emoji: '🏷️',
+    price: offer.price || '',
+    desc: offer.desc || '',
+    address: buyerAddressValue,
+    status: 'pending',
+    time: now.toLocaleDateString('id-ID',{day:'2-digit',month:'short'}) + ', ' + fmtTime(now),
+    buyerUid,
+    buyerEmail,
+    sellerUid: currentUser.uid,
+    sellerEmail: currentUser.email || '',
+    createdAt: serverTimestamp(),
+    createdAtMs: Date.now(),
+    source: 'offer',
+    sourceMsgId: msgId,
+  };
+
+  await updateDoc(msgRef, {
+    'offer.accepted': true,
+    orderCreated: true,
+  });
+
+  await addDoc(collection(db,'orders'), orderPayload);
+  await addDoc(collection(db,'messages'), {
+    type:'order-event',
+    order: orderPayload,
+    senderUid: currentUser.uid,
+    senderRole: userRole,
+    createdAt: serverTimestamp(),
+    time: fmtTime(new Date()),
+  });
+  showToast('✅ Penawaran diterima! Cek riwayat pesanan.');
+};
+window.declineOffer = async (msgId) => {
+  await updateDoc(doc(db,'messages',msgId), {'offer.declined':true});
+  showToast('❌ Penawaran ditolak.');
+};
+
+// ===== STORE =====
+window.saveStore = async () => {
+  const name = document.getElementById('spName').value.trim();
+  if(!name){ showToast('⚠️ Nama toko wajib diisi!'); return; }
+  const wa   = document.getElementById('spWa').value.trim().replace(/\D/g,'');
+  const desc = document.getElementById('spDesc').value.trim();
+  storeData = { name, wa: wa?'62'+wa:'', desc, photo: storePhotoData||storeData.photo };
+  await setDoc(doc(db,'users',currentUser.uid), {
+    role:'seller', storeName:name, wa:storeData.wa, desc, photo:storeData.photo, email:currentUser.email||''
+  }, {merge:true});
+  document.getElementById('hname').textContent = name;
+  document.getElementById('rsInfo').textContent = '🏪 ' + name;
+  updateHeaderLogo();
+  closeModal('spModal');
+  showToast('✅ Profil toko disimpan!');
+};
+
+window.uploadStorePhoto = (event) => {
+  const file = event.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    storePhotoData = e.target.result;
+    document.getElementById('spPhotoImg').src = e.target.result;
+    document.getElementById('spPhotoImg').style.display='block';
+    document.getElementById('spPhotoIcon').style.display='none';
+  };
+  reader.readAsDataURL(file);
+};
+
+window.uploadProductPhoto = (event) => {
+  const file = event.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    productPhotoData = e.target.result;
+    document.getElementById('npPrev').src = e.target.result;
+    document.getElementById('npPrev').style.display = 'block';
+    document.getElementById('npPuIcon').style.display = 'none';
+    document.getElementById('npPuLbl').textContent = 'Foto terpilih ✓';
+  };
+  reader.readAsDataURL(file);
+};
+
+window.openEditProduct = async (productId) => {
+  if(userRole !== 'seller') return;
+  const product = sellerProducts.find(p => p.id === productId);
+  if(!product) return;
+  editingProductId = productId;
+  productPhotoData = product.photo || null;
+  document.getElementById('npTitle').textContent = '✏️ Edit Barang';
+  document.getElementById('npSaveBtn').textContent = 'Simpan Perubahan ✓';
+  document.getElementById('npDeleteBtn').style.display = 'inline-flex';
+  document.getElementById('npName').value = product.name || '';
+  document.getElementById('npStock').value = product.stock || '';
+  document.getElementById('npPrice').value = product.price || '';
+  if(product.photo){
+    document.getElementById('npPrev').src = product.photo;
+    document.getElementById('npPrev').style.display = 'block';
+    document.getElementById('npPuIcon').style.display = 'none';
+    document.getElementById('npPuLbl').textContent = 'Foto terpilih ✓';
+  } else {
+    document.getElementById('npPrev').src = '';
+    document.getElementById('npPrev').style.display = 'none';
+    document.getElementById('npPuIcon').style.display = 'block';
+    document.getElementById('npPuLbl').textContent = 'Klik untuk upload foto barang';
+  }
+  openModal('addProdModal');
+};
+
+window.openModal = (id) => {
+  if(id==='spModal'){
+    document.getElementById('spName').value = storeData.name||'';
+    document.getElementById('spWa').value   = storeData.wa ? storeData.wa.replace(/^62/,'') : '';
+    document.getElementById('spDesc').value = storeData.desc||'';
+    if(storeData.photo){
+      document.getElementById('spPhotoImg').src=storeData.photo;
+      document.getElementById('spPhotoImg').style.display='block';
+      document.getElementById('spPhotoIcon').style.display='none';
+    }
+  }
+  if(id==='addProdModal'){
+    if(!editingProductId){
+      document.getElementById('npTitle').textContent = '📦 Tambah Barang';
+      document.getElementById('npSaveBtn').textContent = 'Simpan Barang ✓';
+      document.getElementById('npDeleteBtn').style.display = 'none';
+      document.getElementById('npName').value = '';
+      document.getElementById('npStock').value = '';
+      document.getElementById('npPrice').value = '';
+      productPhotoData = null;
+      document.getElementById('npPrev').src = '';
+      document.getElementById('npPrev').style.display = 'none';
+      document.getElementById('npPuIcon').style.display = 'block';
+      document.getElementById('npPuLbl').textContent = 'Klik untuk upload foto barang';
+    }
+  }
+  if(id==='addrModal'){
+    document.getElementById('buyerAddrInput').value = buyerAddress || '';
+  }
+  if(id==='ohModal'){
+    oTab = userRole === 'seller' ? 'pending' : 'all';
+    document.querySelectorAll('.oh-tab').forEach(t=>t.className='oh-tab');
+    const firstTab = document.querySelector(`.oh-tab[onclick*="${oTab}"]`);
+    if(firstTab) firstTab.className = 'oh-tab on';
+    document.getElementById('ohTitle').textContent = userRole === 'seller' ? '📋 Pesanan Masuk' : '📋 Riwayat Pesanan';
+    renderOrders();
+  }
+  document.getElementById(id).style.display='flex';
+};
+window.closeModal = (id) => document.getElementById(id).style.display='none';
+
+window.saveBuyerAddress = async () => {
+  if(userRole !== 'buyer') return;
+  const address = document.getElementById('buyerAddrInput').value.trim();
+  if(!address){
+    showToast('⚠️ Alamat wajib diisi.');
+    return;
+  }
+  buyerAddress = address;
+  await setDoc(doc(db,'users',currentUser.uid), {
+    role:'buyer',
+    address,
+    email: currentUser.email || ''
+  }, {merge:true});
+  closeModal('addrModal');
+  showToast('✅ Alamat berhasil disimpan.');
+};
+
+window.openStoreView = async () => {
+  if(userRole === 'buyer'){
+    await loadSellerStoreForBuyer();
+  }
+  document.getElementById('svName').textContent = storeData.name||'Nama Toko';
+  document.getElementById('svDesc').textContent = storeData.desc||'';
+  const hasWa = !!storeData.wa;
+  document.getElementById('svWaBtn').style.display = hasWa?'flex':'none';
+  document.getElementById('svNoWa').style.display  = hasWa?'none':'block';
+  const av = document.getElementById('svAv');
+  const bg = document.getElementById('svHeroBg');
+  if(storeData.photo){
+    av.innerHTML=`<img src="${storeData.photo}" style="width:100%;height:100%;object-fit:cover">`;
+    bg.src=storeData.photo; bg.style.display='block';
+  } else {
+    av.innerHTML='🏪'; bg.style.display='none';
+  }
+  document.getElementById('storeViewModal').style.display='flex';
+};
+
+window.callWa = () => {
+  if(!storeData.wa){ showToast('⚠️ Nomor belum diatur!'); return; }
+  const msg = encodeURIComponent('Halo, saya ingin bertanya tentang produk Anda 🛍️');
+  window.open('https://wa.me/'+storeData.wa+'?text='+msg,'_blank');
+};
+
+// ===== PRODUCTS =====
+window.toggleProdPanel = () => {
+  showingProd = !showingProd;
+  const p = document.getElementById('prodPanel');
+  p.style.display = showingProd?'block':'none';
+  if(showingProd) renderP();
+};
+
+function listenSellerProducts(){
+  if(unsubSellerProducts) unsubSellerProducts();
+  if(!currentUser?.uid) return;
+  const pq = query(collection(db,'users',currentUser.uid,'products'), orderBy('createdAt','asc'));
+  unsubSellerProducts = onSnapshot(pq, snap => {
+    const custom = [];
+    snap.forEach(d => custom.push({id:d.id, ...d.data(), custom:true}));
+    sellerProducts = [...prods, ...custom];
+    if(showingProd) renderP();
+  });
+}
+
+function renderP(){
+  const isSeller = userRole === 'seller';
+  document.getElementById('addProdBtn').style.display = isSeller ? 'flex' : 'none';
+  document.getElementById('ppl').innerHTML = sellerProducts.map(p=>`
+    <div style="margin:9px;background:#f5f5fb;border-radius:11px;overflow:hidden;cursor:pointer;border:1.5px solid transparent;transition:all .18s;position:relative"
+      onmouseenter="this.style.borderColor='#f59e0b'" onmouseleave="this.style.borderColor='transparent'"
+      onclick="sndP('${p.id}')">
+      ${isSeller && p.custom ? `
+      <div style="position:absolute;top:8px;right:8px;display:flex;gap:6px;z-index:2" onclick="event.stopPropagation()">
+        <button class="oh-act" style="padding:4px 8px;font-size:.66rem;background:rgba(255,255,255,.92)" onclick="openEditProduct('${p.id}')">Edit</button>
+        <button class="oh-act danger" style="padding:4px 8px;font-size:.66rem;background:rgba(255,255,255,.92)" onclick="deleteProductById('${p.id}')">Hapus</button>
+      </div>` : ''}
+      <div style="padding:0;background:#f8f7ff;text-align:center;overflow:hidden">
+        ${p.photo
+          ? `<img src="${p.photo}" style="width:100%;height:120px;object-fit:cover;display:block">`
+          : `<div style="padding:12px;text-align:center;font-size:2rem">${p.emoji || '📦'}</div>`}
+      </div>
+      <div style="padding:0 11px 9px">
+        <div style="font-size:.76rem;font-weight:600;color:var(--text)">${p.name}</div>
+        <div style="font-size:.8rem;font-weight:700;color:#f59e0b">${p.price}</div>
+        <div style="font-size:.66rem;color:var(--muted)">${p.stock}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ===== QUICK REPLIES =====
+function renderQR(){
+  const iS = userRole==='seller';
+  document.getElementById('qrb').innerHTML = QR[userRole].map(q=>
+    `<button class="qr${iS?' s':''}" onclick="useQR('${q}')">${q}</button>`
+  ).join('');
+}
+window.useQR = (t) => { document.getElementById('msgi').value=t; document.getElementById('msgi').focus(); };
+
+function maskEmail(email){
+  if(!email || email === 'Tamu') return email;
+  const parts = email.split('@');
+  if(parts.length !== 2) return email;
+  const local = parts[0];
+  const domain = parts[1];
+  const localMasked = local.length <= 3 ? local[0] + '***' : local.slice(0, 3) + '***';
+  const domainParts = domain.split('.');
+  const domainMasked = domainParts[0].slice(0, 2) + '***' + (domainParts[1] ? '.' + domainParts.slice(1).join('.') : '');
+  return `${localMasked}@${domainMasked}`;
+}
+
+function parsePriceNumber(value){
+  const digits = String(value || '').replace(/\D/g,'');
+  return digits ? parseInt(digits, 10) : 0;
+}
+
+function formatPriceNumber(value){
+  return 'Rp ' + Number(value || 0).toLocaleString('id-ID');
+}
+
+// ===== ORDER HISTORY =====
+let oTab='all';
+window.switchOHTab = (tab,el) => {
+  oTab=tab;
+  document.querySelectorAll('.oh-tab').forEach(t=>t.className='oh-tab');
+  el.className='oh-tab on';
+  renderOrders();
+};
+function renderOrders(){
+  const body = document.getElementById('ohBody');
+  const filtered = oTab==='all' ? orders : orders.filter(o=>o.status===oTab);
+  if(!filtered.length){
+    body.innerHTML=`<div class="oh-empty"><span class="oh-ei">📭</span><p>Belum ada pesanan</p></div>`;
+    return;
+  }
+  body.innerHTML = filtered.map(o=>{
+    const s = statusLabel[o.status];
+    return `<div class="oh-card">
+      <div class="oh-card-top">
+        <div class="oh-card-em">${o.photo ? `<img src="${o.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : o.emoji}</div>
+        <div class="oh-card-info">
+          <div class="oh-card-nm">${o.name}</div>
+          <div class="oh-card-pr">${o.qty && o.qty > 1 ? `${o.price} × ${o.qty}` : o.price}</div>
+          ${o.totalPrice && o.qty > 1 ? `<div class="oh-card-ds">Total: ${o.totalPrice}</div>` : ''}
+          ${o.desc?`<div class="oh-card-ds">${o.desc}</div>`:''}
+          ${userRole==='seller'&&o.buyerEmail?`<div class="oh-card-ds">👤 ${maskEmail(o.buyerEmail)}</div>`:''}
+          ${o.address?`<div class="oh-card-ds">📍 ${o.address}</div>`:''}
+        </div>
+        <span class="oh-stat ${s.cls}">${s.label}</span>
+      </div>
+      <div class="oh-card-bot">
+        <span class="oh-card-time">🕐 ${o.time} · #${o.orderNo||o.docId}</span>
+        <div class="oh-card-acts">
+          ${userRole==='buyer'&&o.status==='done'?`<button class="oh-act" onclick="reorder('${o.docId}')">🔁 Lagi</button>`:''}
+          ${userRole==='buyer'&&o.status==='pending'?`<button class="oh-act danger" onclick="cancelOrder('${o.docId}')">Batal</button>`:''}
+          ${userRole==='seller'&&o.status==='pending'?`<button class="oh-act" onclick="updateOrderStatus('${o.docId}','confirmed')">Konfirmasi</button>`:''}
+          ${userRole==='seller'&&o.status==='confirmed'?`<button class="oh-act" onclick="updateOrderStatus('${o.docId}','shipped')">Kirim</button>`:''}
+          ${userRole==='seller'&&o.status==='shipped'?`<button class="oh-act" onclick="updateOrderStatus('${o.docId}','done')">Selesai</button>`:''}
+          ${userRole==='buyer'?`<button class="oh-act" onclick="showToast('📞 Menghubungi seller...')">Hubungi</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+window.addOrder = async (name,emoji,price,desc,photo='', qty=1) => {
+  const now=new Date();
+  const t=now.toLocaleDateString('id-ID',{day:'2-digit',month:'short'})+', '+fmtTime(now);
+  const orderNo = 'O' + Date.now().toString().slice(-8);
+  const unitPriceNum = parsePriceNumber(price);
+  const totalPriceNum = unitPriceNum * Math.max(1, parseInt(qty, 10) || 1);
+  const payload = {
+    orderNo,
+    name,
+    emoji,
+    photo,
+    price,
+    qty: Math.max(1, parseInt(qty, 10) || 1),
+    totalPrice: totalPriceNum ? formatPriceNumber(totalPriceNum) : price,
+    desc,
+    address: buyerAddress || '',
+    status:'pending',
+    time:t,
+    buyerUid: currentUser.uid,
+    buyerEmail: currentUser.email || 'Tamu',
+    createdAt: serverTimestamp(),
+    createdAtMs: Date.now(),
+  };
+
+  await addDoc(collection(db,'orders'), payload);
+  // Mirror order event in messages as a fallback stream.
+  await addDoc(collection(db,'messages'), {
+    type:'order-event',
+    order: payload,
+    senderUid: currentUser.uid,
+    senderRole: userRole,
+    createdAt: serverTimestamp(),
+    time: fmtTime(new Date()),
+  });
+};
+window.buyProd = async (name,emoji,price,desc,photo='') => {
+  pendingBuyItem = { name, emoji, price, desc, photo };
+  document.getElementById('qtyTitle').textContent = `🛒 Beli ${name}`;
+  document.getElementById('qtyProductName').textContent = name;
+  document.getElementById('qtyProductPrice').textContent = `Harga satuan: ${price}`;
+  document.getElementById('qtyProductIcon').textContent = emoji || '📦';
+  document.getElementById('qtyInput').value = 1;
+  updateQtyPreview();
+  document.getElementById('qtyModal').style.display = 'flex';
+  document.getElementById('qtyInput').focus();
+};
+window.updateQtyPreview = () => {
+  if(!pendingBuyItem) return;
+  const qtyInput = document.getElementById('qtyInput');
+  const qty = Math.max(1, parseInt(qtyInput.value, 10) || 1);
+  if(String(qtyInput.value) !== String(qty)) qtyInput.value = qty;
+  const unitPriceNum = parsePriceNumber(pendingBuyItem.price);
+  const totalPriceNum = unitPriceNum * qty;
+  document.getElementById('qtyTotalPreview').textContent = totalPriceNum ? formatPriceNumber(totalPriceNum) : pendingBuyItem.price;
+  document.getElementById('qtyTotalNote').textContent = `${qty} x ${pendingBuyItem.price}`;
+};
+window.closeQtyModal = () => {
+  document.getElementById('qtyModal').style.display = 'none';
+  pendingBuyItem = null;
+};
+window.confirmQtyOrder = async () => {
+  if(!pendingBuyItem) return;
+  const qty = Math.max(1, parseInt(document.getElementById('qtyInput').value, 10) || 1);
+  const item = pendingBuyItem;
+  await addOrder(item.name,item.emoji,item.price,item.desc,item.photo || '',qty);
+  closeQtyModal();
+  showToast('🛒 ' + item.name + ' ditambahkan ke pesanan!');
+};
+window.cancelOrder = async (docId) => {
+  await updateDoc(doc(db,'orders',docId), {status:'cancelled'});
+  showToast('❌ Dibatalkan.');
+};
+window.reorder = async (docId) => {
+  const o=orders.find(x=>x.docId===docId);
+  if(!o) return;
+  await addOrder(o.name,o.emoji,o.price,o.desc,o.photo||'',o.qty || 1);
+  showToast('🛒 Dipesan ulang!');
+};
+window.updateOrderStatus = async (docId,status) => {
+  await updateDoc(doc(db,'orders',docId), {status});
+  showToast('✅ Status pesanan diperbarui.');
+};
+
+// ===== UTILS =====
+window.prevPhoto = (event,prevId,iconId,lblId,storeVar) => {
+  const file=event.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    if(storeVar) offerPhotoData=e.target.result;
+    else offerPhotoData=e.target.result;
+    const prev=document.getElementById(prevId);
+    prev.src=e.target.result; prev.style.display='block';
+    document.getElementById(iconId).style.display='none';
+    document.getElementById(lblId).textContent='Foto terpilih ✓';
+  };
+  reader.readAsDataURL(file);
+};
+window.openLightbox = (src) => {
+  const lb=document.createElement('div');
+  lb.className='lightbox';
+  lb.innerHTML=`<img src="${src}">`;
+  lb.onclick=()=>lb.remove();
+  document.body.appendChild(lb);
+};
+window.hkey=(e)=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}};
+window.ares=(el)=>{el.style.height='auto';el.style.height=Math.min(el.scrollHeight,80)+'px';};
+window.addE=()=>{const i=document.getElementById('msgi');i.value+=EM[Math.floor(Math.random()*EM.length)];i.focus();};
+window.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape' && document.getElementById('qtyModal').style.display === 'flex'){
+    closeQtyModal();
+  }
+});
+function fmtTime(d){return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');}
+window.showToast=(msg)=>{
+  const ex=document.querySelector('.toast');if(ex)ex.remove();clearTimeout(toastTimer);
+  const t=document.createElement('div');t.className='toast';t.textContent=msg;
+  document.body.appendChild(t);toastTimer=setTimeout(()=>t.remove(),3000);
+};
+</script>
+</body>
+</html>
+
